@@ -12,7 +12,7 @@ CSV_co is a C++20 coroutine-based and driven, callback-providing CSV data proces
 - The double quote character in the field must be doubled.
 
 ### Version
-...
+pre 1.0
 
 ### Features
 - Currently only energetic (not lazy) mode of "iteration".
