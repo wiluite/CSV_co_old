@@ -7,6 +7,9 @@ int main()
     using namespace boost::ut;
     using namespace csv_co;
 
+#if defined (WIN32)
+    cfg<override> ={.colors={.none="", .pass="", .fail=""}};
+#endif
     "Simple string functions"_test = []
     {
 
@@ -275,7 +278,7 @@ int main()
                 {
                     rows++;
                 });
-        std::cout << first_string << std::endl;
+
         expect (first_string == "hello, world1!\r");
 
         // for now let us do trimming manually, just for diversity
