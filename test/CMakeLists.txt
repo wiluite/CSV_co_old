@@ -7,12 +7,15 @@ cmake_minimum_required(VERSION 3.16.2 FATAL_ERROR)
 set(CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
 
-#set(EXEC_NAME ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
 
-#project(${EXEC_NAME} CXX)
-
-# build the filename
-#get_filename_component(EXEC_NAME "${EXEC_NAME}" NAME)
+if (NOT MSVC)
+    set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+    set(CMAKE_CXX_FLAGS_DEBUG "-g")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+endif()
 
 function(check_compiler COMPILER version)
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "${COMPILER}")
@@ -53,7 +56,7 @@ endif()
 if(MSVC)
     add_definitions(-DIS_MSVC=true)
     add_definitions(/WX)
-    add_definitions(/W4)
+#    add_definitions(/W4)
     add_definitions(/wd4189)
     add_definitions(/wd4100)
     add_definitions(/wd4996) # 'fopen': This function or variable may be unsafe. Consider using fopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS.
@@ -86,8 +89,6 @@ else()
 
     endif()
 endif()
-
-#add_executable(${EXEC_NAME} main.cpp)
 
 include_directories(../include)
 

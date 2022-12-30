@@ -2,27 +2,27 @@
 
 #include "short_alloc.h"
 
-#ifndef __clang__
+#if (IS_CLANG==0)
 #ifdef __has_include
     #if __has_include(<memory_resource>)
-    #include <memory_resource>
+        #include <memory_resource>
     #endif
 #endif
 #endif
 
-#ifndef __clang__
-#ifdef __cpp_lib_memory_resource
-#endif
+#if (IS_CLANG==0)
+    #ifdef __cpp_lib_memory_resource
+    #endif
 #endif
 
 #ifdef __cpp_lib_coroutine
-#include <coroutine>
-#else
- #if defined (__cpp_impl_coroutine)
     #include <coroutine>
- #else
-    #error "Your compiler must have full coroutine support."
- #endif
+#else
+    #if defined (__cpp_impl_coroutine)
+        #include <coroutine>
+    #else
+        #error "Your compiler must have full coroutine support."
+    #endif
 #endif
 
 #include <optional>
@@ -49,7 +49,7 @@ static void coro_deallocate(void* ptr, size_t sz) noexcept
 namespace csv_co {
 
     using csv_field_string = std::basic_string<char, std::char_traits<char>,
-#ifndef __clang__
+#if (IS_GCC==0) || (IS_MSVC==1)
             std::pmr::polymorphic_allocator<char>
 #else
             std::allocator<char>
@@ -371,7 +371,7 @@ namespace csv_co {
         template <class Range>
         void run(Range const & r)
         {
-            //auto const begin = std::chrono::high_resolution_clock::now();
+            auto const begin = std::chrono::high_resolution_clock::now();
 
             auto source = sender(r);
             auto p = parse();
@@ -397,8 +397,8 @@ namespace csv_co {
                     assert (res.length()==0);
                 }
             }
-            //auto const end = std::chrono::high_resolution_clock::now();
-            //std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-begin).count() << " msecs" <<std::endl;
+            auto const end = std::chrono::high_resolution_clock::now();
+            std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-begin).count() << " msecs" <<std::endl;
         }
 
         std::function <void (csv_field_string const & frame)> field_callback_;
