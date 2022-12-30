@@ -415,8 +415,7 @@ namespace csv_co {
             mmap_.map(fp.string().c_str(), mmap_error);
             if (mmap_error)
             {
-                const auto& errmsg = mmap_error.message();
-                throw exception(errmsg.c_str());
+                throw exception ("Exception! ", mmap_error.message(),' ', fp.string());
             }
             run(mmap_);
         }
@@ -433,46 +432,53 @@ namespace csv_co {
                 : field_callback_(std::move(fcb)), new_row_callback_(std::move(nrc))
         { run(csv_field_string(s)); }
 
-        struct exception : public std::runtime_error {
-            explicit exception(char const* main_message, char const* param = "");
-            [[nodiscard]] char const* what() const noexcept(noexcept(std::data(std::string()))) override;
-        private:
-            std::string pass_param(char const * param) const;
-            std::string msg;
-        };
 
+        struct exception : public std::runtime_error
+        {
+            template <typename ... Types>
+            constexpr exception(Types ... args) : std::runtime_error("")
+            {
+                save_details(args...);
+            }
+
+            [[nodiscard]] char const* what() const noexcept override
+            {
+              return msg.c_str();
+            }
+
+        private:
+            std::string msg;
+
+            void save_details() noexcept {}
+
+            template <class First, class ... Rest>
+            void save_details(First && first, Rest && ... rest)
+            {
+                save_detail(std::forward<First>(first));
+                save_details(std::forward<Rest>(rest)...);
+            }
+
+            template <typename T>
+            void save_detail(T && v)
+            {
+                if constexpr(std::is_arithmetic_v<T>)
+                    msg += std::to_string(v);
+                else
+                    msg += v;
+            }
+        };
     };
 
-    template <class Delimiter, class Quote, class TrimPolicy>
-    reader<Delimiter, Quote, TrimPolicy>::exception::exception(char const* main_message, char const* param) :
-            std::runtime_error(main_message), msg(pass_param(param)) {}
-
-    template <class Delimiter, class Quote, class TrimPolicy>
-    [[nodiscard]] char const* reader<Delimiter, Quote, TrimPolicy>::exception::what() const
-    noexcept(noexcept(std::data(std::string()))) {
-        return std::data(msg);
-    }
-
-    template <class Delimiter, class Quote, class TrimPolicy>
-    std::string reader<Delimiter, Quote, TrimPolicy>::exception::pass_param(char const * param) const {
-        if (param)
-        {
-            char buf[255];
-            std::strcpy(buf, std::runtime_error::what());
-            return std::strcat(buf, param);
-        }
-        return "";
-    }
-
-    template <class Delimiter, class Quote, class TrimPolicy>
+    template <class TrimPolicy, class Quote, class Delimiter>
     template<typename T, typename G, class ... Bases>
-    void reader<Delimiter, Quote, TrimPolicy>::promise_type_base<T, G, Bases...>::
+    void reader<TrimPolicy, Quote, Delimiter>::promise_type_base<T, G, Bases...>::
     unhandled_exception()
     {
         std::cout << "unhandled\n";
         std::terminate();
     }
 
+} // namespace
 
-}
+
 

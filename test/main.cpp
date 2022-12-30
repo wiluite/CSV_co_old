@@ -10,6 +10,7 @@ int main()
 #if defined (WIN32)
     cfg<override> ={.colors={.none="", .pass="", .fail=""}};
 #endif
+
     "Simple string functions"_test = []
     {
 
@@ -264,6 +265,10 @@ int main()
         auto cells{0u};
         std::string first_string {};
         auto rows {0u};
+
+        expect(nothrow([&]
+        {
+
         reader r
                 (std::filesystem::path ("game.csv")
                 , [&](auto & s)
@@ -278,6 +283,7 @@ int main()
                 {
                     rows++;
                 });
+        }) >> fatal) << "doesn't throw";
 
         expect (first_string == "hello, world1!\r");
 
@@ -288,6 +294,7 @@ int main()
 
         expect (rows == 100000);
         expect (cells/rows == 6);
+
     };
 
 }
