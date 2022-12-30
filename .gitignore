@@ -34,3 +34,4 @@ config.h
 cmake-build*
 .idea*
 build*
+include/csv_co/reader.hpp
