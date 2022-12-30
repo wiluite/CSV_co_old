@@ -36,7 +36,7 @@ int main()
 
         s = "qwerty\"\t\n \r";
         trim_right_if_last(s, R"(")");
-        expect (s == "qwerty");
+        expect (s == "qwerty\t\n \r");
 
         s = "qwerty\"\t\n~\r";
         trim_right_if_last(s, R"(")");
@@ -196,7 +196,7 @@ int main()
 
         expect (cells == 5);
         expect (v == std::vector<csv_field_string>
-                {{"2022"," Mouse",R"( It's a correct use case: "Hello, Christmas Tree!")",""," 4900,00"}});
+                {{"2022"," Mouse",R"( It's a correct use case: "Hello, Christmas Tree!" )",""," 4900,00"}});
 
     };
 
@@ -275,7 +275,14 @@ int main()
                 {
                     rows++;
                 });
+        std::cout << first_string << std::endl;
+        expect (first_string == "hello, world1!\r");
+
+        // for now let us do trimming manually, just for diversity
+        // that is what the parser does when with a trimming policy
+        string_functions::alltrim(first_string);
         expect (first_string == "hello, world1!");
+
         expect (rows == 100000);
         expect (cells/rows == 6);
     };
