@@ -29,8 +29,7 @@
 #include "mmap.hpp"
 #include <functional>
 #include <filesystem>
-
-#include <cstring>
+#include <concepts>
 
 template <std::size_t N = 1000>
 constexpr const std::size_t coroutine_arena_max_alloc = N;
@@ -73,12 +72,33 @@ namespace csv_co {
             }
         };
     }
+    template <class T>
+    concept TrimPolicyConcept = requires (T, csv_field_string s)
+    {
+        { T::trim(s) } -> std::convertible_to<void>; // TODO: more precise check required
+    };
+
+    template <char ch> struct quote_char {
+        constexpr static char value = ch;
+    };
+    using double_quote = quote_char<'"'>;
+    template <class T>
+    concept QuoteConcept = requires (T t)
+    {
+        { T::value } -> std::convertible_to<char>;
+        { t } -> std::convertible_to<quote_char<T::value>>;
+    };
+
 
     template <char ch> struct delimiter {
         constexpr static char value = ch;
     };
-    template <char ch> struct quote_char {
-        constexpr static char value = ch;
+    using comma_delimiter = delimiter<','>;
+    template <class T>
+    concept DelimiterConcept = requires (T t)
+    {
+        { T::value } -> std::convertible_to<char>;
+        { t } -> std::convertible_to<delimiter<T::value>>;
     };
 
     namespace string_functions {
@@ -115,7 +135,8 @@ namespace csv_co {
         }
 
     }
-    template <typename TrimPolicy = trim_policy::no_trimming, typename Quote=quote_char<'"'>, typename Delimiter=delimiter<','> >
+    template <TrimPolicyConcept TrimPolicy = trim_policy::no_trimming
+            , QuoteConcept Quote = double_quote, DelimiterConcept Delimiter = comma_delimiter>
     class reader
     {
         template<typename T, typename G,
@@ -135,6 +156,7 @@ namespace csv_co {
             std::suspend_always final_suspend() noexcept { return {}; }
             void                return_void() {}
             void                unhandled_exception();
+
 
             void* operator new(size_t size) noexcept
             {
@@ -436,7 +458,7 @@ namespace csv_co {
         struct exception : public std::runtime_error
         {
             template <typename ... Types>
-            constexpr exception(Types ... args) : std::runtime_error("")
+            explicit constexpr exception(Types ... args) : std::runtime_error("")
             {
                 save_details(args...);
             }
@@ -469,12 +491,11 @@ namespace csv_co {
         };
     };
 
-    template <class TrimPolicy, class Quote, class Delimiter>
+    template <TrimPolicyConcept TrimPolicy, QuoteConcept Quote, DelimiterConcept Delimiter>
     template<typename T, typename G, class ... Bases>
     void reader<TrimPolicy, Quote, Delimiter>::promise_type_base<T, G, Bases...>::
     unhandled_exception()
     {
-        std::cout << "unhandled\n";
         std::terminate();
     }
 

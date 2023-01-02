@@ -19,6 +19,7 @@ pre 1.0
 - Callbacks for each field (or cell in CSV_co's terminology).
 - Callbacks for new rows.
 - String data types only, apply lexical cast transformations yourself.
+- Strong typed (concept-based) reader template parameters
 
 ### Acknowledgments
 To Andreas Fertig for his coroutine tutorials and code that was highly borrowed.

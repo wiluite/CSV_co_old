@@ -24,7 +24,7 @@ int main()
         expect (is_vain(s));
 
         s = R"(""Christmas Tree"" is bad food)";
-        unique_quote(s, quote_char<'"'>());
+        unique_quote(s, double_quote());
         expect (s== R"("Christmas Tree" is bad food)");
 
     };
@@ -135,7 +135,10 @@ int main()
     {
 
         std::vector<csv_field_string> v;
-        reader<trim_policy::no_trimming, quote_char<'"'>, delimiter<';'>> r
+
+        using new_delimiter = delimiter<';'>;
+
+        reader<trim_policy::no_trimming, double_quote, new_delimiter> r
                 ("one;two;three\nfour;five;six"
                 ,[&](auto & s)
                 {
@@ -247,7 +250,10 @@ int main()
 
         constexpr std::size_t CORRECT_RESULT_AGAIN = 1;
         cells = 0u;
-        reader<trim_policy::no_trimming, quote_char<'`'>> r3
+
+        using new_quote_char = quote_char<'`'>;
+
+        reader<trim_policy::no_trimming, new_quote_char> r3
                 (R"(`just one, and only one, quoted cell`)"
                         , [&](auto & s)
                 {
