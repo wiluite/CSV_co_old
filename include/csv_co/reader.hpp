@@ -136,6 +136,7 @@ namespace csv_co {
         }
 
     }
+
     template <TrimPolicyConcept TrimPolicy = trim_policy::no_trimming
             , QuoteConcept Quote = double_quote, DelimiterConcept Delimiter = comma_delimiter>
     class reader
@@ -555,10 +556,8 @@ namespace csv_co {
 
     public:
 
-        template <class FieldCallback = decltype(field_callback_), typename NewRowCallback=std::function <void ()>>
-        explicit reader(std::filesystem::path const & fp, FieldCallback fcb=[](csv_field_string const & frame){}
-                , NewRowCallback nrc=[]{}) : field_callback_(std::move(fcb)),  new_row_callback_(std::move(nrc))
-                , src {mio::ro_mmap {}}
+        // TODO: how to stop calling for rvalue string?
+        explicit reader(std::filesystem::path const & fp) : src {mio::ro_mmap {}}
         {
             std::error_code mmap_error;
             std::get<0>(src).map(fp.string().c_str(), mmap_error);
@@ -566,25 +565,13 @@ namespace csv_co {
             {
                 throw exception ("Exception! ", mmap_error.message(),' ', fp.string());
             }
-            
-            run();
         }
 
-        template <template<class> class Alloc=std::allocator,
-                class FieldCallback = std::function <void (csv_field_string const & frame)>>
-        explicit reader (std::basic_string<char, std::char_traits<char>, Alloc<char>> const & s,
-                             FieldCallback field_callback=[](csv_field_string const & frame){})
-                : field_callback_(std::move(field_callback)), src {s}
-        {
-            run();
-        }
-
-        template <class FieldCallback, typename NewRowCallback=std::function <void ()>>
-        explicit reader (const char * s, FieldCallback fcb=[](csv_field_string const & frame){}, NewRowCallback nrc=[]{})
-                : field_callback_(std::move(fcb)), new_row_callback_(std::move(nrc)), src {csv_field_string(s)}
-        {
-            run();
-        }
+        template <template<class> class Alloc=std::allocator>
+        explicit reader (std::basic_string<char, std::char_traits<char>, Alloc<char>> const & s)
+                : src {s} {}
+                
+        explicit reader (const char * s) : src {csv_field_string(s)} {}
 
         [[nodiscard]] std::size_t cols() const noexcept
         {
@@ -600,8 +587,11 @@ namespace csv_co {
             return result;
         }
 
-        void run()
+        template <class FieldCallback = decltype(field_callback_), typename NewRowCallback=std::function <void ()>>
+        void run(FieldCallback fcb=[](csv_field_string const & frame){}, NewRowCallback nrc=[]{})
         {
+            field_callback_ = fcb;
+            new_row_callback_ = nrc;
             std::visit([&](auto&& arg) { run_impl(arg); }, src);
         }
 

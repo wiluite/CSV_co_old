@@ -48,33 +48,49 @@ int main()
 
     };
 
-    "Reader callback calculates cells"_test = []
+    "Reader callback calculates cells from char const *"_test = []
     {
 
         auto cells{0u};
-        reader r
-                ("1,2,3\n4,5,6\n7,8,9\n",[&](auto & s)
-                {
-                    static_assert(std::is_same_v<decltype(s), const csv_field_string&>);
-                    ++cells;
-                });
+        reader r ("1,2,3\n4,5,6\n7,8,9\n");
+        r.run([&](auto & s)
+              {
+                  static_assert(std::is_same_v<decltype(s), const csv_field_string&>);
+                  ++cells;
+              });
+
         expect(cells == 9);
 
     };
+
+    "Reader callback calculates cells from rvalue string"_test = []
+    {
+
+        auto cells{0u};
+        reader r (csv_field_string("1,2,3\n4,5,6\n"));
+        r.run([&](auto & s)
+              {
+                  static_assert(std::is_same_v<decltype(s), const csv_field_string&>);
+                  ++cells;
+              });
+
+        expect(cells == 6);
+
+    };
+
 
     "Reader callbacks calculate cols and rows"_test = []
     {
 
         auto cells{0u}, rows{0u};
-        reader r
-                ("one,two,three\nfour,five,six\nseven,eight,nine\n"
-                 ,[&](auto & s)
-                 {
-                     cells++;
-                 }, [&]()
-                 {
-                     rows++;
-                 });
+        reader r ("one,two,three\nfour,five,six\nseven,eight,nine\n");
+        r.run([&](auto & s)
+              {
+                  cells++;
+              }, [&]()
+              {
+                  rows++;
+              });
 
         expect(cells % rows == 0);
         auto cols = cells/rows;
@@ -82,16 +98,24 @@ int main()
 
     };
 
+    "Reader calculates cols and rows via methods"_test = []
+    {
+
+        reader r ("one,two,three\nfour,five,six\nseven,eight,nine\n,ten,eleven,twelve\n");
+        expect (r.rows() == 4);
+        expect (r.cols() == 3);
+
+    };
+
     "Reader callback is filling data"_test = []
     {
 
         std::vector<csv_field_string> v;
-        reader r
-                ("one,two,three\n four, five, six\nseven,eight,nine\n"
-                 ,[&](auto & s)
-                 {
-                    v.push_back(s);
-                 });
+        reader r ("one,two,three\n four, five, six\nseven,eight,nine\n");
+        r.run([&](auto & s)
+              {
+                  v.push_back(s);
+              });
 
         std::vector<csv_field_string> v2 {"one","two","three"," four"," five"," six","seven","eight","nine"};
         expect (v2 == v);
@@ -103,12 +127,13 @@ int main()
 
         std::vector<csv_field_string> v;
         static char const trimming_chars [] = " \t\r";
-        reader<trim_policy::trimming<trimming_chars>> r
-                ("one, \ttwo , three \n four, five, six\n seven , eight\t , nine\r\n"
-                ,[&](auto & s)
-                {
-                    v.push_back(s);
-                });
+        reader<trim_policy::trimming<trimming_chars>>
+            r ("one, \ttwo , three \n four, five, six\n seven , eight\t , nine\r\n");
+
+        r.run([&](auto & s)
+              {
+                  v.push_back(s);
+              });
 
         std::vector<csv_field_string> v2 {"one","two","three","four","five","six","seven","eight","nine"};
         expect (v2 == v);
@@ -119,12 +144,11 @@ int main()
     {
 
         std::vector<csv_field_string> v;
-        reader r
-                ("one,two,three\nfour,five,six"
-                ,[&](auto & s)
-                {
-                    v.push_back(s);
-                });
+        reader r ("one,two,three\nfour,five,six");
+        r.run([&](auto & s)
+              {
+                  v.push_back(s);
+              });
 
         expect (v.size() == 6);
         expect (v.back() == "six");
@@ -138,12 +162,11 @@ int main()
 
         using new_delimiter = delimiter<';'>;
 
-        reader<trim_policy::no_trimming, double_quote, new_delimiter> r
-                ("one;two;three\nfour;five;six"
-                ,[&](auto & s)
-                {
-                    v.push_back(s);
-                });
+        reader<trim_policy::no_trimming, double_quote, new_delimiter> r ("one;two;three\nfour;five;six");
+        r.run([&](auto & s)
+              {
+                  v.push_back(s);
+              });
 
         expect (v.size() == 6);
         expect (v == std::vector<csv_field_string>{{"one","two","three","four","five","six"}});
@@ -152,13 +175,13 @@ int main()
 
     "Reader provides empty cell as expected"_test = []
     {
+
         std::vector<csv_field_string> v;
-        reader r
-                ("one,two,three\nfour,,six"
-                ,[&](auto & s)
-                {
-                    v.push_back(s);
-                });
+        reader r ("one,two,three\nfour,,six");
+        r.run([&](auto & s)
+              {
+                  v.push_back(s);
+              });
 
         expect (v.size() == 6);
         expect (v == std::vector<csv_field_string>{{"one","two","three","four","","six"}});
@@ -166,7 +189,7 @@ int main()
     };
 
 
-    // -- Now, Topic Change: Quoting --
+    // -- so now... topic change: Quoting --
 
     // NOTE:
     "Incorrect use of single quotes inside quoted cell"_test = []
@@ -174,13 +197,12 @@ int main()
 
         std::vector<csv_field_string> v;
         std::size_t cells{0};
-        reader r
-                (R"(2022, Mouse, "It's incorrect to use "Hello, Christmas Tree!"" ,, "4900,00")"
-                ,[&](auto & s)
-                {
-                    cells++;
-                    v.push_back(s);
-                });
+        reader r (R"(2022, Mouse, "It's incorrect to use "Hello, Christmas Tree!"" ,, "4900,00")");
+        r.run([&](auto & s)
+              {
+                  cells++;
+                  v.push_back(s);
+              });
 
         expect (cells == 6);
         expect (v == std::vector<csv_field_string>
@@ -193,13 +215,13 @@ int main()
 
         std::vector<csv_field_string> v;
         std::size_t cells{0};
-        reader r
-                (R"(2022, Mouse, "It's a correct use case: ""Hello, Christmas Tree!""" ,, "4900,00")"
-                ,[&](auto & s)
-                {
-                    cells++;
-                    v.push_back(s);
-                });
+        reader r (R"(2022, Mouse, "It's a correct use case: ""Hello, Christmas Tree!""" ,, "4900,00")");
+
+        r.run([&](auto & s)
+              {
+                  cells++;
+                  v.push_back(s);
+              });
 
         expect (cells == 5);
         expect (v == std::vector<csv_field_string>
@@ -212,13 +234,13 @@ int main()
 
         std::vector<csv_field_string> v;
         std::size_t cells{0};
-        reader r
-                (R"(2022,Mouse,What is quoted is necessary part "Hello, Tree!" of the sell,,"4900,00")"
-                , [&](auto & s)
-                {
-                    cells++;
-                    v.push_back(s);
-                });
+        reader r (R"(2022,Mouse,What is quoted is necessary part "Hello, Tree!" of the sell,,"4900,00")");
+        r.run([&](auto & s)
+              {
+                  cells++;
+                  v.push_back(s);
+              });
+
         expect (cells == 5);
         expect (v == std::vector<csv_field_string>
                 {{"2022", "Mouse", R"(What is quoted is necessary part "Hello, Tree!" of the sell)","","4900,00"}});
@@ -230,22 +252,20 @@ int main()
 
         constexpr std::size_t CORRECT_RESULT = 1;
         auto cells{0u};
-        reader r
-                (R"("just one, and only one, quoted cell")"
-                , [&](auto & s)
-                {
-                    cells++;
-                });
+        reader r (R"("just one, and only one, quoted cell")");
+        r.run([&](auto & s)
+              {
+                  cells++;
+              });
         expect (cells == CORRECT_RESULT);
 
         constexpr std::size_t INCORRECT_RESULT = 3;
         cells = 0u;
-        reader r2
-                (R"(`just one, and only one, quoted cell`)"
-                        , [&](auto & s)
-                {
-                    cells++;
-                });
+        reader r2 (R"(`just one, and only one, quoted cell`)");
+        r2.run([&](auto & s)
+               {
+                   cells++;
+               });
         expect (cells == INCORRECT_RESULT);
 
         constexpr std::size_t CORRECT_RESULT_AGAIN = 1;
@@ -253,43 +273,43 @@ int main()
 
         using new_quote_char = quote_char<'`'>;
 
-        reader<trim_policy::no_trimming, new_quote_char> r3
-                (R"(`just one, and only one, quoted cell`)"
-                        , [&](auto & s)
-                {
-                    expect (s == "just one, and only one, quoted cell");
-                    cells++;
-                });
+        reader<trim_policy::no_trimming, new_quote_char> r3 (R"(`just one, and only one, quoted cell`)");
+        r3.run([&](auto & s)
+               {
+                   expect (s == "just one, and only one, quoted cell");
+                   cells++;
+               });
         expect (cells == CORRECT_RESULT_AGAIN);
 
     };
 
     // -- Topic change: File processing --
 
+
     "Reader processes a well-known file"_test = []
     {
+
         auto cells{0u};
         std::string first_string {};
         auto rows {0u};
 
         expect(nothrow([&]
         {
-
-        reader r
-                (std::filesystem::path ("game.csv")
-                , [&](auto & s)
-                {
-                    cells++;
-                    if (rows < 1)
-                    {
-                        first_string += s;
-                    }
-                }
-                , [&]
-                {
-                    rows++;
-                });
-        }) >> fatal) << "doesn't throw";
+            reader r (std::filesystem::path ("game.csv"));
+            r.run([&](auto & s)
+                  {
+                      cells++;
+                      if (rows < 1)
+                      {
+                          first_string += s;
+                      }
+                  }
+                    , [&]
+                  {
+                      rows++;
+                  });
+        }) >> fatal
+        ) << "doesn't throw";
 
         expect (first_string == "hello, world1!\r");
 
