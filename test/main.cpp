@@ -29,21 +29,21 @@ int main()
 
     };
 
-    "Special [trim_right_if_last] function"_test = []
+    "Special [del_last_quote] function"_test = []
     {
 
         using namespace string_functions;
 
         csv_field_string s = R"(qwerty")";
-        trim_right_if_last (s, R"(")");
+        del_last_quote(s, R"(")");
         expect (s == "qwerty");
 
         s = "qwerty\"\t\n \r";
-        trim_right_if_last(s, R"(")");
+        del_last_quote(s, R"(")");
         expect (s == "qwerty\t\n \r");
 
         s = "qwerty\"\t\n~\r";
-        trim_right_if_last(s, R"(")");
+        del_last_quote(s, R"(")");
         expect(s == "qwerty\"\t\n~\r");
 
     };

@@ -115,7 +115,7 @@ namespace csv_co {
         }
 
         template <class CHAR_T>
-        inline void trim_right_if_last (auto & source, CHAR_T ch)
+        inline void del_last_quote (auto & source, CHAR_T ch)
         {
             auto const pos = source.find_last_of(ch);
             assert (pos != std::string::npos);
@@ -240,7 +240,15 @@ namespace csv_co {
 
             T operator()()
             {
-                return std::move(mCoroHdl.promise().mValue);
+                auto tmp{std::move(mCoroHdl.promise().mValue)};
+                if constexpr (
+                        std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<std::size_t>> ||
+                        std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<bool>>
+                        )
+                    mCoroHdl.promise().mValue = std::nullopt;
+                else
+                    mCoroHdl.promise().mValue.clear();
+                return tmp;
             }
 
             void send(U signal)
@@ -299,6 +307,8 @@ namespace csv_co {
         };
 
         using FSM = async_generator<csv_field_string, char>;
+        using FSM_cols = async_generator<std::optional<std::size_t>, char>;
+        using FSM_rows = async_generator<std::optional<bool>, char>;
 
         static constexpr char LF{'\n'};
 
@@ -356,7 +366,7 @@ namespace csv_co {
                         }
                         if (vain)
                         {
-                            trim_right_if_last(field, Quote::value);
+                            del_last_quote(field, Quote::value);
                         }
                         unique_quote(field, Quote());
                         TrimPolicy::trim(field);
@@ -375,10 +385,96 @@ namespace csv_co {
             }
         }
 
+        FSM_cols parse_cols() const
+        {
+            std::optional<std::size_t> cols = std::nullopt;
+            for(;;)
+            {
+                auto b = co_await char{};
+                if (limiter(b))
+                {
+                    cols = cols.has_value() ? cols.value() + 1 : 1;
+                    if (LF == b)
+                    {
+                        co_yield cols;
+                    }
+                    continue;
+                }
+                if (Quote::value == b)
+                {
+                    std::size_t quote_counter = 1;
+                    for(;;)
+                    {
+                        b = co_await char{};
+                        if (!limiter(b))
+                        {
+                            quote_counter += (Quote::value == b) ? 1 : 0;
+                            continue;
+                        }
+                        if (quote_counter % 2)
+                        {
+                            continue;
+                        }
+
+                        cols = cols.has_value() ? cols.value() + 1 : 1;
+                        if (LF == b)
+                        {
+                            co_yield cols;
+                        }
+                        break;
+                    }
+                    continue;
+                }
+            }
+        }
+
+        FSM_rows parse_rows() const
+        {
+            std::optional<bool> line_end = std::nullopt;
+            for(;;)
+            {
+                auto b = co_await char{};
+                if (limiter(b))
+                {
+                    if (LF == b)
+                    {
+                        line_end = true;
+                        co_yield line_end;
+                    }
+                    continue;
+                }
+                if (Quote::value == b)
+                {
+                    std::size_t quote_counter = 1;
+                    for(;;)
+                    {
+                        b = co_await char{};
+                        if (!limiter(b))
+                        {
+                            quote_counter += (Quote::value == b) ? 1 : 0;
+                            continue;
+                        }
+                        if (quote_counter % 2)
+                        {
+                            continue;
+                        }
+
+                        if (LF == b)
+                        {
+                            line_end = true;
+                            co_yield line_end;
+                        }
+                        break;
+                    }
+                    continue;
+                }
+            }
+        }
+
         using coroutine_stream_type = mio::ro_mmap::value_type;
 
         template <typename Range>
-        generator<coroutine_stream_type> sender(Range const & r)
+        generator<coroutine_stream_type> sender(Range const & r) const
         {
             for (auto e : r)
             {
@@ -391,10 +487,8 @@ namespace csv_co {
         }
 
         template <class Range>
-        void run(Range const & r)
+        void run_impl(Range const & r)
         {
-            auto const begin = std::chrono::high_resolution_clock::now();
-
             auto source = sender(r);
             auto p = parse();
             for(const auto& b : source)
@@ -402,7 +496,7 @@ namespace csv_co {
                 p.send(b);
                 if (const auto& res = p(); !res.empty())
                 {
-                    if (res.front() == '\0' and res.size() == 1)
+                    if (res.front() == '\0')
                     {
                         assert(res.size() == 1);
                         field_callback_("");
@@ -419,10 +513,41 @@ namespace csv_co {
                     assert (res.length()==0);
                 }
             }
-            auto const end = std::chrono::high_resolution_clock::now();
-            std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-begin).count() << " msecs" <<std::endl;
         }
 
+        template <class Range>
+        std::size_t cols_impl(Range const & r) const noexcept
+        {
+            auto source = sender(r);
+            auto p = parse_cols();
+            for(const auto& b : source)
+            {
+                p.send(b);
+                if (const auto& res = p(); res.has_value())
+                {
+                    return res.value();
+                }
+            }
+            return 0;
+        }
+
+        template <class Range>
+        std::size_t rows_impl(Range const & r) const noexcept
+        {
+            auto source = sender(r);
+            auto p = parse_rows();
+            auto rows {0u};
+            for(const auto& b : source)
+            {
+                p.send(b);
+                if (const auto& res = p(); res.has_value())
+                {
+                    rows++;
+                }
+            }
+            return rows;
+        }
+        
         std::function <void (csv_field_string const & frame)> field_callback_;
         std::function <void ()> new_row_callback_;
         mio::ro_mmap mmap_;
@@ -439,7 +564,7 @@ namespace csv_co {
             {
                 throw exception ("Exception! ", mmap_error.message(),' ', fp.string());
             }
-            run(mmap_);
+            run_impl(mmap_);
         }
 
         template <template<class> class Alloc=std::allocator,
@@ -447,12 +572,12 @@ namespace csv_co {
         explicit reader (std::basic_string<char, std::char_traits<char>, Alloc<char>> const & s,
                              FieldCallback field_callback=[](csv_field_string const & frame){})
                 : field_callback_(std::move(field_callback))
-        { run(s); }
+        { run_impl(s); }
 
         template <class FieldCallback, typename NewRowCallback=std::function <void ()>>
         explicit reader (const char * s, FieldCallback fcb=[](csv_field_string const & frame){}, NewRowCallback nrc=[]{})
                 : field_callback_(std::move(fcb)), new_row_callback_(std::move(nrc))
-        { run(csv_field_string(s)); }
+        { run_impl(csv_field_string(s)); }
 
 
         struct exception : public std::runtime_error
