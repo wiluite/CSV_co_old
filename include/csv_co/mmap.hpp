@@ -1,7 +1,7 @@
 /* This code initially belongs to:
  * Copyright 20xx-2022 https://github.com/mandreyel
  *
- * Copyright 2022 wiluite (verification and reduction for special purposes)
+ * Copyright 2022 wiluite (verification, reduction and addition for special purposes)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this
  * software and associated documentation files (the "Software"), to deal in the Software
@@ -80,6 +80,30 @@ namespace mio {
         ro_mmap() = default;
         ro_mmap(const ro_mmap&) = delete;
         ro_mmap& operator=(const ro_mmap&) = delete;
+
+        ro_mmap(ro_mmap && o) noexcept : ro_mmap()
+        {
+            Swap(o);
+        }
+
+        void Swap (ro_mmap & o) noexcept
+        {
+            std::swap(data_,o.data_);
+            std::swap(length_,o.length_);
+            std::swap(mapped_length_, o.mapped_length_);
+            std::swap(file_handle_,o.file_handle_);
+#ifdef _WIN32
+            std::swap(file_mapping_handle_,o.file_mapping_handle_);
+#endif
+            std::swap(is_handle_internal_,o.is_handle_internal_);
+        }
+
+        ro_mmap& operator=(ro_mmap && o) noexcept
+        {
+            ro_mmap tmp(std::move(o));
+            Swap(tmp);
+            return *this;
+        }
 
         ~ro_mmap();
 
