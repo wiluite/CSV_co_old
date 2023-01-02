@@ -570,7 +570,7 @@ namespace csv_co {
         template <template<class> class Alloc=std::allocator>
         explicit reader (std::basic_string<char, std::char_traits<char>, Alloc<char>> const & s)
                 : src {s} {}
-                
+
         explicit reader (const char * s) : src {csv_field_string(s)} {}
 
         [[nodiscard]] std::size_t cols() const noexcept

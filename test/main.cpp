@@ -234,7 +234,7 @@ int main()
 
         std::vector<csv_field_string> v;
         std::size_t cells{0};
-        reader r (R"(2022,Mouse,What is quoted is necessary part "Hello, Tree!" of the sell,,"4900,00")");
+        reader r (R"(2022,Mouse,What is quoted is necessary part "Hello, Tree!" of the cell,,"4900,00")");
         r.run([&](auto & s)
               {
                   cells++;
@@ -243,7 +243,7 @@ int main()
 
         expect (cells == 5);
         expect (v == std::vector<csv_field_string>
-                {{"2022", "Mouse", R"(What is quoted is necessary part "Hello, Tree!" of the sell)","","4900,00"}});
+                {{"2022", "Mouse", R"(What is quoted is necessary part "Hello, Tree!" of the cell)","","4900,00"}});
 
     };
 
