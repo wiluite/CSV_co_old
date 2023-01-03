@@ -11,7 +11,7 @@ int main()
     {
         static char const trimming_chars [] = "\r";
         reader<trim_policy::trimming<trimming_chars>> r (std::filesystem::path ("uspop.csv"));
-        std::vector<std::vector<csv_field_string>> matrix (r.rows());
+        std::vector<std::vector<cell_string>> matrix (r.rows());
         auto const cols = r.cols();
         for (auto & elem : matrix) elem.resize(cols);
 

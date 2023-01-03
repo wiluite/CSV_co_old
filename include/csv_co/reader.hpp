@@ -1,6 +1,7 @@
 #pragma once
 
 #include "short_alloc.h"
+#include "mmap.hpp"
 
 #if (IS_CLANG==0)
 #ifdef __has_include
@@ -26,7 +27,6 @@
 #endif
 
 #include <optional>
-#include "mmap.hpp"
 #include <functional>
 #include <filesystem>
 #include <concepts>
@@ -48,7 +48,7 @@ static void coro_deallocate(void* ptr, size_t sz) noexcept
 
 namespace csv_co {
 
-    using csv_field_string = std::basic_string<char, std::char_traits<char>,
+    using cell_string = std::basic_string<char, std::char_traits<char>,
 #if (IS_GCC==0) || (IS_MSVC==1)
             std::pmr::polymorphic_allocator<char>
 #else
@@ -59,7 +59,7 @@ namespace csv_co {
     namespace trim_policy {
         struct no_trimming {
         public:
-            static void trim (csv_field_string & s) {
+            static void trim (cell_string & s) {
                 s.erase(0,0);
             }
         };
@@ -67,14 +67,14 @@ namespace csv_co {
         template <char const * list>
         struct trimming {
         public:
-            static void trim (csv_field_string & s) {
+            static void trim (cell_string & s) {
                 s.erase(0,s.find_first_not_of(list));
                 s.erase(s.find_last_not_of(list)+1);
             }
         };
     }
     template <class T>
-    concept TrimPolicyConcept = requires (T, csv_field_string s)
+    concept TrimPolicyConcept = requires (T, cell_string s)
     {
         { T::trim(s) } -> std::convertible_to<void>; // TODO: more precise check required
     };
@@ -109,7 +109,7 @@ namespace csv_co {
             source.erase(source.find_last_not_of(" \n\r\t") + 1);
         }
 
-        inline bool is_vain( auto s)
+        inline bool is_devastated(auto s)
         {
             alltrim(s);
             return s.empty();
@@ -121,7 +121,7 @@ namespace csv_co {
             auto const pos = source.find_last_of(ch);
             assert (pos != std::string::npos);
             auto const sv = std::string_view (source.begin() + pos + 1, source.end());
-            if (is_vain(std::decay_t<decltype(source)>{sv.begin(), sv.end()}))
+            if (is_devastated(std::decay_t<decltype(source)>{sv.begin(), sv.end()}))
                 source.erase(pos,1);
         }
 
@@ -308,27 +308,29 @@ namespace csv_co {
             PromiseTypeHandle mCoroHdl;
         };
 
-        using FSM = async_generator<csv_field_string, char>;
+        using FSM = async_generator<cell_string, char>;
         using FSM_cols = async_generator<std::optional<std::size_t>, char>;
         using FSM_rows = async_generator<std::optional<bool>, char>;
 
         static constexpr char LF{'\n'};
+        static constexpr char special{'\0'};
 
         [[nodiscard]] inline bool limiter(char b) const
         {
             return (Delimiter::value == b) || (LF == b);
         }
 
-        inline void overcome_architectural_limitations(auto & s)
+        inline void overcome_architectural_limitations(auto & s) const
         {
             if (s.empty())
-                s.push_back('\0');
+                s.push_back(special);
         }
 
-        FSM parse()
+        FSM parse() const
         {
-            csv_field_string field;
-            for(;;) {
+            cell_string field;
+            for(;;)
+            {
                 auto b = co_await char{};
                 if (limiter(b))
                 {
@@ -346,8 +348,8 @@ namespace csv_co {
                 {
                     using namespace string_functions;
 
-                    bool vain = is_vain(field);
-                    if (!vain)
+                    bool devastated = is_devastated(field);
+                    if (!devastated)
                     {
                         field.push_back(b);
                     }
@@ -366,7 +368,7 @@ namespace csv_co {
                             field.push_back(b);
                             continue;
                         }
-                        if (vain)
+                        if (devastated)
                         {
                             del_last_quote(field, Quote::value);
                         }
@@ -491,45 +493,43 @@ namespace csv_co {
         }
 
         template <class Range>
-        void run_impl(Range const & r)
+        void run_impl(Range const & r) const
         {
             auto source = sender(r);
             auto p = parse();
+            auto const * cb = header_field_callback_ ? &header_field_callback_ : &field_callback_;
             for(const auto& b : source)
             {
                 p.send(b);
                 if (const auto& res = p(); !res.empty())
                 {
-                    if (res.front() == '\0')
-                    {
-                        assert(res.size() == 1);
-                        field_callback_("");
-                    } else
-                    {
-                        field_callback_(res.back() != LF ? res : csv_field_string{res.begin(), res.end()-1});
-                    }
+                    (*cb)(res.front() == special?(""):(res.back()!=LF?res:cell_string{res.begin(), res.end() - 1}));
+
                     if (res.back() == LF)
                     {
                         new_row_callback_();
+                        // change callback to normal if it was header_field_callback_ TODO: optimize it!
+                        if (cb != &field_callback_)
+                        {
+                            cb = &field_callback_;
+                        }
                     }
-                } else
-                {
-                    assert (res.length()==0);
-                }
+                } // else assert (res.length()==0);
             }
         }
 
-        std::variant<mio::ro_mmap, csv_field_string> src;
+        std::variant<mio::ro_mmap, cell_string> src;
 
     public:
-        using header_callback_type = std::function <void (csv_field_string const & frame)>;
-        using field_callback_type = std::function <void (csv_field_string const & frame)>;
+        using header_field_callback_type = std::function <void (cell_string const & frame)>;
+        using field_callback_type = std::function <void (cell_string const & frame)>;
         using new_row_callback_type = std::function <void ()>;
 
 
     private:
-        field_callback_type field_callback_;
-        new_row_callback_type new_row_callback_;
+        header_field_callback_type header_field_callback_;   // nullptr by default, or used-default by run(). UB if nullptr
+        field_callback_type field_callback_;     // always user-defined: by run() or UB if user-defined nullptr
+        new_row_callback_type new_row_callback_; // defaulted or user-defined by run(), or UB if user-defined nullptr
 
     public:
 
@@ -559,7 +559,7 @@ namespace csv_co {
         }
 
         // let us express C-style string parameter constructor via usual string parameter constructor
-        explicit reader (const char * s) : reader(csv_field_string(s)) {}
+        explicit reader (const char * s) : reader(cell_string(s)) {}
 
         [[nodiscard]] std::size_t cols() const noexcept
         {
@@ -604,6 +604,15 @@ namespace csv_co {
 
         void run(field_callback_type fcb, new_row_callback_type nrc=[]{})
         {
+            assert(!header_field_callback_);
+            field_callback_ = std::move(fcb);
+            new_row_callback_ = std::move(nrc);
+            std::visit([&](auto&& arg) { run_impl(arg); }, src);
+        }
+
+        void run(header_field_callback_type hfcb, field_callback_type fcb, new_row_callback_type nrc=[]{})
+        {
+            header_field_callback_ = std::move(hfcb);
             field_callback_ = std::move(fcb);
             new_row_callback_ = std::move(nrc);
             std::visit([&](auto&& arg) { run_impl(arg); }, src);
@@ -617,7 +626,7 @@ namespace csv_co {
                 save_details(args...);
             }
 
-            [[nodiscard]] char const* what() const noexcept override
+            [[nodiscard]] constexpr char const* what() const noexcept override
             {
               return msg.c_str();
             }
