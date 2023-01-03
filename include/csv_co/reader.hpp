@@ -482,7 +482,9 @@ namespace csv_co {
             {
                 co_yield e;
             }
-            if (LF != r[r.size()-1])
+
+            assert(r.length());
+            if (LF != r[r.length()-1])
             {
                 co_yield '\n';
             }
@@ -517,46 +519,25 @@ namespace csv_co {
             }
         }
 
-        template <class Range>
-        std::size_t cols_impl(Range const & r) const noexcept
-        {
-            auto source = sender(r);
-            auto p = parse_cols();
-            for(const auto& b : source)
-            {
-                p.send(b);
-                if (const auto& res = p(); res.has_value())
-                {
-                    return res.value();
-                }
-            }
-            return 0;
-        }
-
-        template <class Range>
-        std::size_t rows_impl(Range const & r) const noexcept
-        {
-            auto source = sender(r);
-            auto p = parse_rows();
-            auto rows {0u};
-            for(const auto& b : source)
-            {
-                p.send(b);
-                if (const auto& res = p(); res.has_value())
-                {
-                    rows++;
-                }
-            }
-            return rows;
-        }
-
-        std::function <void (csv_field_string const & frame)> field_callback_;
-        std::function <void ()> new_row_callback_;
         std::variant<mio::ro_mmap, csv_field_string> src;
 
     public:
+        using header_callback_type = std::function <void (csv_field_string const & frame)>;
+        using field_callback_type = std::function <void (csv_field_string const & frame)>;
+        using new_row_callback_type = std::function <void ()>;
 
-        // TODO: how to stop calling for rvalue string?
+
+    private:
+        field_callback_type field_callback_;
+        new_row_callback_type new_row_callback_;
+
+    public:
+
+        using trim_policy_type = TrimPolicy;
+        using quote_type = Quote;
+        using delimiter_type = Delimiter;
+
+        // TODO: stop calling for rvalue string...
         explicit reader(std::filesystem::path const & fp) : src {mio::ro_mmap {}}
         {
             std::error_code mmap_error;
@@ -569,29 +550,62 @@ namespace csv_co {
 
         template <template<class> class Alloc=std::allocator>
         explicit reader (std::basic_string<char, std::char_traits<char>, Alloc<char>> const & s)
-                : src {s} {}
+                : src {s}
+        {
+            if (std::get<1>(src).empty())
+            {
+                throw exception ("Exception! ", "Argument cannot be empty");
+            }
+        }
 
-        explicit reader (const char * s) : src {csv_field_string(s)} {}
+        // let us express C-style string parameter constructor via usual string parameter constructor
+        explicit reader (const char * s) : reader(csv_field_string(s)) {}
 
         [[nodiscard]] std::size_t cols() const noexcept
         {
             auto result {0};
-            std::visit([&](auto&& arg) { result = cols_impl(arg); }, src);
+            std::visit([&](auto&& arg)
+            {
+                auto source = sender(arg);
+                auto p = parse_cols();
+                for(const auto& b : source)
+                {
+                    p.send(b);
+                    if (const auto& res = p(); res.has_value())
+                    {
+                        result = res.value();
+                        return;
+                    }
+                }
+            }, src);
             return result;
         }
 
         [[nodiscard]] std::size_t rows() const noexcept
         {
-            auto result {0};
-            std::visit([&](auto&& arg) { result = reader::rows_impl(arg); }, src);
-            return result;
+            auto rows {0};
+
+            std::visit([&](auto&& arg)
+            {
+                auto source = sender(arg);
+                auto p = parse_rows();
+
+                for(const auto& b : source)
+                {
+                    p.send(b);
+                    if (const auto& res = p(); res.has_value())
+                    {
+                        rows++;
+                    }
+                }
+            }, src);
+            return rows;
         }
 
-        template <class FieldCallback = decltype(field_callback_), typename NewRowCallback=std::function <void ()>>
-        void run(FieldCallback fcb=[](csv_field_string const & frame){}, NewRowCallback nrc=[]{})
+        void run(field_callback_type fcb, new_row_callback_type nrc=[]{})
         {
-            field_callback_ = fcb;
-            new_row_callback_ = nrc;
+            field_callback_ = std::move(fcb);
+            new_row_callback_ = std::move(nrc);
             std::visit([&](auto&& arg) { run_impl(arg); }, src);
         }
 

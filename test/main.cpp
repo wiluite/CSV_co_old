@@ -1,6 +1,7 @@
 #define BOOST_UT_DISABLE_MODULE
 #include "ut.hpp"
 #include <csv_co/reader.hpp>
+#include <fstream>
 
 int main()
 {
@@ -98,12 +99,20 @@ int main()
 
     };
 
-    "Reader calculates cols and rows via methods"_test = []
+    "Reader calculates cols and rows via special methods"_test = []
     {
 
         reader r ("one,two,three\nfour,five,six\nseven,eight,nine\n,ten,eleven,twelve\n");
         expect (r.rows() == 4);
         expect (r.cols() == 3);
+
+        // exception, csv-string cannot be empty
+        // this is to correspond to behaviour of memory-mapping empty files
+        expect(throws([]{reader r2 ("");}));
+
+        reader r3 ("\n"); // yes, there is ONE empty field, so there is a row and a column
+        expect (r3.rows() == 1);
+        expect (r3.cols() == 1);
 
     };
 
@@ -286,7 +295,7 @@ int main()
     // -- Topic change: File processing --
 
 
-    "Reader processes a well-known file"_test = []
+    "Read a well-known file"_test = []
     {
 
         auto cells{0u};
@@ -308,6 +317,8 @@ int main()
                   {
                       rows++;
                   });
+            expect (r.rows() == 100000);
+            expect (r.cols() == 6);
         }) >> fatal
         ) << "doesn't throw";
 
@@ -320,6 +331,34 @@ int main()
 
         expect (rows == 100000);
         expect (cells/rows == 6);
+
+
+    };
+
+    "Read an empty file"_test = []
+    {
+
+        auto cells{0u};
+        auto rows {0u};
+
+        std::fstream fs;
+        fs.open("empty.csv", std::ios::out);
+        fs.close();
+
+        expect(throws([&]
+                       {
+                           reader r (std::filesystem::path ("empty.csv"));
+                           r.run([&](auto & s)
+                                 {
+                                     cells++;
+                                 }
+                                 , [&]
+                                 {
+                                     rows++;
+                                 });
+
+                       }) >> fatal
+        ) << "it should throw!";
 
     };
 
