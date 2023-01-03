@@ -373,6 +373,7 @@ int main()
         auto cells{0u};
         auto rows {0u};
         std::vector<cell_string> v;
+        std::vector<cell_string> v2;
         expect(nothrow([&]
                       {
                           static char const chars [] = "\r";
@@ -383,6 +384,7 @@ int main()
                                 }
                                 , [&](auto & s)
                                 {
+                                    v2.push_back(s);
                                     cells++;
                                 }
                                 , [&]
@@ -393,7 +395,12 @@ int main()
                       }) >> fatal
         ) << "it shouldn't throw";
         expect (v == std::vector<cell_string>{"city","region","country","population"});
-        expect (rows == 11);
+        expect (cells == (rows-1) * v.size());
+        expect (v2.size() == 10*4);
+        expect (v2.front() == "Southborough");
+        expect (v2.back() == "42605");
+        int _ = std::stoi (v2.back());
+        expect (_ == 42605);
 
     };
 
