@@ -492,43 +492,17 @@ namespace csv_co {
             }
         }
 
-        template <class Range>
-        void run_impl(Range const & r) const
-        {
-            auto source = sender(r);
-            auto p = parse();
-            auto const * cb = header_field_callback_ ? &header_field_callback_ : &field_callback_;
-            for(const auto& b : source)
-            {
-                p.send(b);
-                if (const auto& res = p(); !res.empty())
-                {
-                    (*cb)(res.front() == special?(""):(res.back()!=LF?res:cell_string{res.begin(), res.end() - 1}));
-
-                    if (res.back() == LF)
-                    {
-                        new_row_callback_();
-                        // change callback to normal if it was header_field_callback_ TODO: optimize it!
-                        if (cb != &field_callback_)
-                        {
-                            cb = &field_callback_;
-                        }
-                    }
-                } // else assert (res.length()==0);
-            }
-        }
-
         std::variant<mio::ro_mmap, cell_string> src;
 
     public:
         using header_field_callback_type = std::function <void (cell_string const & frame)>;
-        using field_callback_type = std::function <void (cell_string const & frame)>;
+        using value_field_callback_type = std::function <void (cell_string const & frame)>;
         using new_row_callback_type = std::function <void ()>;
 
 
     private:
         header_field_callback_type header_field_callback_;   // nullptr by default, or used-default by run(). UB if nullptr
-        field_callback_type field_callback_;     // always user-defined: by run() or UB if user-defined nullptr
+        value_field_callback_type value_field_callback_;     // always user-defined: by run() or UB if user-defined nullptr
         new_row_callback_type new_row_callback_; // defaulted or user-defined by run(), or UB if user-defined nullptr
 
     public:
@@ -602,20 +576,69 @@ namespace csv_co {
             return rows;
         }
 
-        void run(field_callback_type fcb, new_row_callback_type nrc=[]{})
+        // inlined by CLion from previous variant
+        void run(value_field_callback_type fcb, new_row_callback_type nrc=[]{})
         {
             assert(!header_field_callback_);
-            field_callback_ = std::move(fcb);
+            value_field_callback_ = std::move(fcb);
             new_row_callback_ = std::move(nrc);
-            std::visit([&](auto&& arg) { run_impl(arg); }, src);
+            std::visit([&](auto&& arg) {
+                auto source = sender(arg);
+                auto p = parse();
+                for (const auto &b: source) {
+                    p.send(b);
+                    if (const auto &res = p(); !res.empty()) {
+                        value_field_callback_(
+                                res.front() == special ? ("") : (res.back() != LF ? res : cell_string{res.begin(),
+                                                                                                      res.end() - 1}));
+
+                        if (res.back() == LF) {
+                            new_row_callback_();
+                        }
+                    }
+                }
+            }, src);
         }
 
-        void run(header_field_callback_type hfcb, field_callback_type fcb, new_row_callback_type nrc=[]{})
+        // inlined by CLion from previous variant
+        void run(header_field_callback_type hfcb, value_field_callback_type fcb, new_row_callback_type nrc=[]{})
         {
             header_field_callback_ = std::move(hfcb);
-            field_callback_ = std::move(fcb);
+            value_field_callback_ = std::move(fcb);
             new_row_callback_ = std::move(nrc);
-            std::visit([&](auto&& arg) { run_impl(arg); }, src);
+            std::visit([&](auto&& arg) {
+                auto cols1 = cols();
+                auto source = sender(arg);
+                auto p = parse();
+                auto b = source.begin();
+                for (;;) {
+                    p.send(*b);
+                    ++b;
+                    if (const auto &res = p(); !res.empty()) {
+                        header_field_callback_(
+                                res.front() == special ? ("") : (res.back() != LF ? res : cell_string{res.begin(),
+                                                                                                      res.end() - 1}));
+                        --cols1;
+                    }
+                    if (!cols1) {
+                        new_row_callback_();
+                        break;
+                    }
+                }
+                while (b != source.end()) {
+                    p.send(*b);
+                    ++b;
+                    if (const auto &res = p(); !res.empty()) {
+                        value_field_callback_(
+                                res.front() == special ? ("") : (res.back() != LF ? res : cell_string{res.begin(),
+                                                                                                      res.end() - 1}));
+
+                        if (res.back() == LF) {
+                            new_row_callback_();
+                        }
+                    }
+                }
+            }, src);
         }
 
         struct exception : public std::runtime_error

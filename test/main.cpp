@@ -141,8 +141,8 @@ int main()
     {
 
         std::vector<cell_string> v;
-        static char const trimming_chars [] = " \t\r";
-        reader<trim_policy::trimming<trimming_chars>>
+        static char const chars [] = " \t\r";
+        reader<trim_policy::trimming<chars>>
             r ("one, \ttwo , three \n four, five, six\n seven , eight\t , nine\r\n");
 
         r.run([&](auto & s)
@@ -319,7 +319,7 @@ int main()
                           first_string += s;
                       }
                   }
-                    , [&]
+                  , [&]
                   {
                       rows++;
                   });
@@ -357,7 +357,7 @@ int main()
                                  {
                                      cells++;
                                  }
-                                 , [&]
+                                 ,[&]
                                  {
                                      rows++;
                                  });
@@ -390,10 +390,14 @@ int main()
                                 , [&]
                                 {
                                     rows++;
-                                });
+                                }
+                          );
 
+                          expect (rows == r.rows());
+ 
                       }) >> fatal
         ) << "it shouldn't throw";
+
         expect (v == std::vector<cell_string>{"city","region","country","population"});
         expect (cells == (rows-1) * v.size());
         expect (v2.size() == 10*4);
@@ -401,7 +405,7 @@ int main()
         expect (v2.back() == "42605");
         int _ = std::stoi (v2.back());
         expect (_ == 42605);
-
+        
     };
 
 }

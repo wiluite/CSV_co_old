@@ -9,14 +9,13 @@ int main()
 {
     try
     {
-        static char const trimming_chars [] = "\r";
-        reader<trim_policy::trimming<trimming_chars>> r (std::filesystem::path ("uspop.csv"));
+        static char const trim_chars [] = "\r";
+        reader<trim_policy::trimming<trim_chars>> r (std::filesystem::path ("uspop.csv"));
         std::vector<std::vector<cell_string>> matrix (r.rows());
         auto const cols = r.cols();
         for (auto & elem : matrix) elem.resize(cols);
 
-        auto c_row{0u};
-        auto c_col{0u};
+        auto c_row {0u}, c_col{0u};
 
         r.run(
                 [&](auto & s){ matrix[c_row][c_col++] = s;},[&] { c_row++; c_col = 0;}
@@ -27,10 +26,10 @@ int main()
 #if 0
         // Print all table
 
-        static_assert(std::is_same_v<typename decltype(r)::trim_policy_type, trim_policy::trimming<trimming_chars>>);
-        for (auto &row : matrix)
+        static_assert(std::is_same_v<typename decltype(r)::trim_policy_type, trim_policy::trimming<trim_chars>>);
+        for (auto const & row : matrix)
         {
-            for (auto & elem : row)
+            for (auto const & elem : row)
             {
                 std::cout << elem << ' ';
             }
