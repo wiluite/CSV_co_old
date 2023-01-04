@@ -103,6 +103,7 @@ namespace csv_co {
     };
 
     namespace string_functions {
+
         inline void alltrim (auto & source)
         {
             source.erase(0,source.find_first_not_of(" \n\r\t"));
@@ -503,12 +504,14 @@ namespace csv_co {
 
 
     private:
-        header_field_callback_type header_field_callback_;   // nullptr by default, or used-default by run(). UB if nullptr
-        value_field_callback_type value_field_callback_;     // always user-defined: by run() or UB if user-defined nullptr
-        new_row_callback_type new_row_callback_; // defaulted or user-defined by run(), or UB if user-defined nullptr
+        // nullptr by default, or used-default by run(). UB if nullptr
+        header_field_callback_type header_field_callback_;
+        // always user-defined: by run() or UB if user-defined nullptr
+        value_field_callback_type value_field_callback_;
+        // defaulted or user-defined by run(), or UB if user-defined nullptr
+        new_row_callback_type new_row_callback_;
 
     public:
-
         using trim_policy_type = TrimPolicy;
         using quote_type = Quote;
         using delimiter_type = Delimiter;
@@ -557,6 +560,27 @@ namespace csv_co {
             return result;
         }
 
+        [[nodiscard]] std::size_t rows() const noexcept
+        {
+            auto rows {0};
+
+            std::visit([&](auto&& arg)
+            {
+                auto source = sender(arg);
+                auto p = parse_rows();
+
+                for(const auto& b : source)
+                {
+                    p.send(b);
+                    if (const auto& res = p(); res.has_value())
+                    {
+                        rows++;
+                    }
+                }
+            }, src);
+            return rows;
+        }
+
         [[nodiscard]] bool valid() const noexcept
         {
             auto result {false};
@@ -580,28 +604,6 @@ namespace csv_co {
             }, src);
 
             return result;
-        }
-
-
-        [[nodiscard]] std::size_t rows() const noexcept
-        {
-            auto rows {0};
-
-            std::visit([&](auto&& arg)
-            {
-                auto source = sender(arg);
-                auto p = parse_rows();
-
-                for(const auto& b : source)
-                {
-                    p.send(b);
-                    if (const auto& res = p(); res.has_value())
-                    {
-                        rows++;
-                    }
-                }
-            }, src);
-            return rows;
         }
 
         void run(value_field_callback_type fcb, new_row_callback_type nrc=[]{})
