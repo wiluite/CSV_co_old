@@ -408,5 +408,22 @@ int main()
         
     };
 
+    "Check validity of the csv format"_test = []
+    {
+
+        auto cells{0u};
+        expect (reader ("1,2,3\n").valid());
+        expect (!reader ("1,2,3\n4\n").valid());
+        expect (!reader ("1,2,3\n4,5\n").valid());
+        expect (reader ("1,2,3\n4,5,6\n").valid());
+        expect (!reader ("1,2,3\n4,5,6,7\n").valid());
+        expect (!reader ("1,2,3\n4,5,6\n7").valid());
+        expect (reader ("1,2,3\n4,5,6\n7,8,9").valid());
+
+        expect (reader (std::filesystem::path ("smallpop.csv")).valid());
+        expect (!reader (std::filesystem::path ("game-invalid-format.csv")).valid());
+
+    };
+
 }
 

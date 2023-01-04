@@ -13,3 +13,9 @@ add_custom_command(
         COMMAND ${CMAKE_COMMAND} -E copy
         ${CMAKE_SOURCE_DIR}/example/smallpop.csv
         ${CMAKE_CURRENT_BINARY_DIR}/smallpop.csv)
+
+add_custom_command(
+        TARGET test POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_SOURCE_DIR}/test/game-invalid-format.csv
+        ${CMAKE_CURRENT_BINARY_DIR}/game-invalid-format.csv)

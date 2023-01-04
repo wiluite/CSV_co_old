@@ -401,6 +401,7 @@ namespace csv_co {
                     if (LF == b)
                     {
                         co_yield cols;
+                        cols = 0;
                     }
                     continue;
                 }
@@ -424,6 +425,7 @@ namespace csv_co {
                         if (LF == b)
                         {
                             co_yield cols;
+                            cols = 0;
                         }
                         break;
                     }
@@ -555,6 +557,32 @@ namespace csv_co {
             return result;
         }
 
+        [[nodiscard]] bool valid() const noexcept
+        {
+            auto result {false};
+            std::optional<std::size_t> curr_cols = std::nullopt;
+            std::visit([&](auto&& arg)
+            {
+                auto source = sender(arg);
+                auto p = parse_cols();
+                for(const auto& b : source)
+                {
+                    p.send(b);
+                    if (const auto& res = p(); res.has_value())
+                    {
+                        if (curr_cols == std::nullopt)
+                        {
+                            curr_cols = res.value();
+                            result = true; // if no more lines but this - stay valid!
+                        } else if (!(result = (curr_cols.value() == res.value()))) { return;}
+                    }
+                }
+            }, src);
+
+            return result;
+        }
+
+
         [[nodiscard]] std::size_t rows() const noexcept
         {
             auto rows {0};
@@ -576,7 +604,6 @@ namespace csv_co {
             return rows;
         }
 
-        // inlined by CLion from previous variant
         void run(value_field_callback_type fcb, new_row_callback_type nrc=[]{})
         {
             assert(!header_field_callback_);
@@ -600,7 +627,6 @@ namespace csv_co {
             }, src);
         }
 
-        // inlined by CLion from previous variant
         void run(header_field_callback_type hfcb, value_field_callback_type fcb, new_row_callback_type nrc=[]{})
         {
             header_field_callback_ = std::move(hfcb);
