@@ -49,7 +49,7 @@ static void coro_deallocate(void* ptr, size_t sz) noexcept
 namespace csv_co {
 
     using cell_string = std::basic_string<char, std::char_traits<char>,
-#if (IS_GCC==0) || (IS_MSVC==1)
+#if (IS_MSVC==1)
             std::pmr::polymorphic_allocator<char>
 #else
             std::allocator<char>

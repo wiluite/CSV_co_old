@@ -202,8 +202,7 @@ int main()
         expect (v == std::vector<cell_string>{{"one", "two", "three", "four", "", "six"}});
 
     };
-
-
+    
     // -- so now... topic change: Quoting --
 
     // NOTE:
@@ -328,7 +327,8 @@ int main()
         }) >> fatal
         ) << "it shouldn't throw";
 
-        expect (first_string == "hello, world1!\r");
+        // depending on line-breaking style, note: reader's trimming  policy is absent
+        expect (first_string == "hello, world1!\r" || first_string == "hello, world1!");
 
         // for now let us do trimming manually, just for diversity
         // that is what the parser does when with a trimming policy
