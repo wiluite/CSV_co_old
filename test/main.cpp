@@ -141,8 +141,8 @@ int main()
     {
 
         std::vector<cell_string> v;
-        static char const chars [] = " \t\r";
-        reader<trim_policy::trimming<chars>>
+
+        reader<trim_policy::alltrim>
             r ("one, \ttwo , three \n four, five, six\n seven , eight\t , nine\r\n");
 
         r.run([&](auto & s)

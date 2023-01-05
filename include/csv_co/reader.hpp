@@ -60,7 +60,7 @@ namespace csv_co {
         struct no_trimming {
         public:
             static void trim (cell_string & s) {
-                s.erase(0,0);
+                //s.erase(0,0);
             }
         };
 
@@ -72,6 +72,8 @@ namespace csv_co {
                 s.erase(s.find_last_not_of(list)+1);
             }
         };
+        static char const chars [] = " \t\r";
+        using alltrim = trimming<chars>;
     }
     template <class T>
     concept TrimPolicyConcept = requires (T, cell_string s)
