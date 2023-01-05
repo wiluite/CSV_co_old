@@ -1,5 +1,3 @@
-[UNDER CONSTRUCTION]
-
 ## C++20 CSV data reader
 
 CSV_co is a C++20 coroutine-driven, one-pass and callback-providing CSV data processor, reader or parser. Hope, the tool is to a large extent in line with standard RFC 4180, as the following requirements seem satisfied:
@@ -12,7 +10,7 @@ CSV_co is a C++20 coroutine-driven, one-pass and callback-providing CSV data pro
 - The double quote character in the field must be doubled.
 
 ### Version
-pre 1.0
+Pre 1.0.0
 
 ### Features
 - Currently only energetic (not lazy) mode of "iteration".
@@ -20,6 +18,15 @@ pre 1.0
 - Callbacks for new rows.
 - String data types only, apply lexical cast transformations yourself.
 - Strong typed (concept-based) reader template parameters
+
+### Minimum Supported Compilers
+- Linux
+  - GNU GCC 10.2 C++ compiler
+  - LLVM Clang 12.0 C++ compiler 
+- Windows 
+  - MSVS 2019 Update 9 (16.9.4) +
+  - Cygwin with GCC 10.2 C++ compiler
+  - MinGW with GCC 10.2 C++ compiler
 
 ### Acknowledgments
 To Andreas Fertig for his coroutine tutorials and code that was highly borrowed.
