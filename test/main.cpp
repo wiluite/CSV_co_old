@@ -22,10 +22,10 @@ int main()
         expect(s == R"(123 456)");
 
         s = "\n\t \r \t\r\n ";
-        expect (is_devastated(s));
+        expect (devastated(s));
 
         s = R"(""Christmas Tree"" is bad food)";
-        unique_quote(s, double_quote());
+        unique_quote(s, double_quote::value);
         expect (s== R"("Christmas Tree" is bad food)");
 
     };

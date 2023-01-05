@@ -57,10 +57,17 @@ namespace csv_co {
 #endif
             >;
 
+    struct cell_span
+    {
+        typename cell_string::pointer begin;
+        typename cell_string::pointer end;
+    };
+
+
     namespace trim_policy {
         struct no_trimming {
         public:
-            static void trim (cell_string & s) {}
+            static void trim (cell_string const &) {}
         };
 
         template <char const * list>
@@ -110,7 +117,7 @@ namespace csv_co {
             source.erase(source.find_last_not_of(" \n\r\t") + 1);
         }
 
-        inline bool is_devastated(auto s)
+        inline bool devastated(auto s)
         {
             alltrim(s);
             return s.empty();
@@ -122,16 +129,15 @@ namespace csv_co {
             auto const pos = source.find_last_of(ch);
             assert (pos != std::string::npos);
             auto const sv = std::string_view (source.begin() + pos + 1, source.end());
-            if (is_devastated(std::decay_t<decltype(source)>{sv.begin(), sv.end()}))
+            if (devastated(std::decay_t<decltype(source)>{sv.begin(), sv.end()}))
                 source.erase(pos,1);
         }
 
-        template <typename Quote>
-        inline void unique_quote (auto & s, Quote)
+        inline void unique_quote (auto & s, char q)
         {
-            auto const last = unique(s.begin(), s.end(), [](auto const& first, auto const& second)
+            auto const last = unique(s.begin(), s.end(), [&q](auto const& first, auto const& second)
             {
-                return first==Quote::value && second==Quote::value;
+                return first==q && second==q;
             });
             s.erase(last, s.end());
         }
@@ -233,6 +239,7 @@ namespace csv_co {
             [[nodiscard]] awaiter await_transform(T)
             { return awaiter{mRecentSignal}; }
         };
+
         template<typename T, typename U>
         struct [[nodiscard]] async_generator
         {
@@ -246,7 +253,8 @@ namespace csv_co {
                 auto tmp{std::move(mCoroHdl.promise().mValue)};
                 if constexpr (
                         std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<std::size_t>> ||
-                        std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<bool>>
+                        std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<bool>> ||
+                        std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<cell_span>>
                         )
                     mCoroHdl.promise().mValue = std::nullopt;
                 else
@@ -312,6 +320,7 @@ namespace csv_co {
         using FSM = async_generator<cell_string, char>;
         using FSM_cols = async_generator<std::optional<std::size_t>, char>;
         using FSM_rows = async_generator<std::optional<bool>, char>;
+        using FSM_cell_span = async_generator<std::optional<cell_span>, char>;
 
         static constexpr char LF{'\n'};
         static constexpr char special{'\0'};
@@ -349,8 +358,8 @@ namespace csv_co {
                 {
                     using namespace string_functions;
 
-                    bool devastated = is_devastated(field);
-                    if (!devastated)
+                    bool was_devastated = devastated(field);
+                    if (!was_devastated)
                     {
                         field.push_back(b);
                     }
@@ -369,11 +378,11 @@ namespace csv_co {
                             field.push_back(b);
                             continue;
                         }
-                        if (devastated)
+                        if (was_devastated)
                         {
                             del_last_quote(field, Quote::value);
                         }
-                        unique_quote(field, Quote());
+                        unique_quote(field, Quote::value);
                         TrimPolicy::trim(field);
                         overcome_architectural_limitations(field);
                         if (LF == b)
@@ -392,13 +401,13 @@ namespace csv_co {
 
         FSM_cols parse_cols() const
         {
-            std::optional<std::size_t> cols = std::nullopt;
+            std::optional<std::size_t> cols = 0;
             for(;;)
             {
                 auto b = co_await char{};
                 if (limiter(b))
                 {
-                    cols = cols.has_value() ? cols.value() + 1 : 1;
+                    cols = cols.value() + 1;
                     if (LF == b)
                     {
                         co_yield cols;
@@ -421,8 +430,7 @@ namespace csv_co {
                         {
                             continue;
                         }
-
-                        cols = cols.has_value() ? cols.value() + 1 : 1;
+                        cols = cols.value() + 1;
                         if (LF == b)
                         {
                             co_yield cols;
@@ -548,6 +556,8 @@ namespace csv_co {
         reader (reader && other) noexcept = default;
         reader & operator=(reader && other) noexcept = default;
 
+        ~reader() = default;
+
         [[nodiscard]] std::size_t cols() const noexcept
         {
             auto result {0};
@@ -606,7 +616,10 @@ namespace csv_co {
                         {
                             curr_cols = res.value();
                             result = true; // if no more lines but this - stay valid!
-                        } else if (!(result = (curr_cols.value() == res.value()))) { return;}
+                        } else
+                        {
+                            if (!(result = (curr_cols.value() == res.value()))) { return;}
+                        }
                     }
                 }
             }, src);
