@@ -60,9 +60,7 @@ namespace csv_co {
     namespace trim_policy {
         struct no_trimming {
         public:
-            static void trim (cell_string & s) {
-                //s.erase(0,0);
-            }
+            static void trim (cell_string & s) {}
         };
 
         template <char const * list>
@@ -92,7 +90,6 @@ namespace csv_co {
         { T::value } -> std::convertible_to<char>;
         { t } -> std::convertible_to<quote_char<T::value>>;
     };
-
 
     template <char ch> struct delimiter {
         constexpr static char value = ch;
