@@ -2,7 +2,7 @@
 
 ## C++20 CSV data reader
 
-CSV_co is a C++20 coroutine-based and driven, callback-providing CSV data processor, reader or parser. Hope, the tool is to a large extent in line with standard RFC 4180, as the following requirements seem satisfied:
+CSV_co is a C++20 coroutine-driven, one-pass and callback-providing CSV data processor, reader or parser. Hope, the tool is to a large extent in line with standard RFC 4180, as the following requirements seem satisfied:
 
 - MS-DOS (and Unix) style line endings.
 - Optional header line.
