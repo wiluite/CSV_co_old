@@ -1,3 +1,8 @@
+# Copyright (c) Andreas Fertig.
+# SPDX-License-Identifier: MIT
+
+# Copyright wiluite (additions)
+
 cmake_minimum_required(VERSION 3.16.2 FATAL_ERROR)
 project(csv_co)
 

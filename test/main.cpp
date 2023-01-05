@@ -299,7 +299,6 @@ int main()
 
     // -- Topic change: File processing --
 
-
     "Read a well-known file"_test = []
     {
 
@@ -407,10 +406,10 @@ int main()
 
     };
 
+    // -- Topic change: Check Validity --
     "Check validity of the csv format"_test = []
     {
 
-        auto cells{0u};
         expect (reader ("1,2,3\n").valid());
         expect (!reader ("1,2,3\n4\n").valid());
         expect (!reader ("1,2,3\n4,5\n").valid());
@@ -421,6 +420,68 @@ int main()
 
         expect (reader (std::filesystem::path ("smallpop.csv")).valid());
         expect (!reader (std::filesystem::path ("game-invalid-format.csv")).valid());
+
+    };
+
+    // -- Topic change: Move Operations --
+    "Move construction and assignment"_test = []
+    {
+
+        reader r ("One,Two,Three\n1,2,3\n");
+        reader r2 = std::move(r);
+        //---- r is in Move-From State. We must not touch it, wait for destruction, but let us risk:
+        expect (!r.valid());
+        //-------------------------------------
+        expect (r2.valid());
+        expect (r2.cols() == 3);
+        expect (r2.rows() == 2);
+        auto head_cells{0u};
+        auto cells{0u};
+        auto rows {0u};
+        r2.run([&head_cells] (auto const & s)
+            {
+                expect (s=="One" || s=="Two" || s=="Three");
+                head_cells++;
+            }
+            ,[&cells](auto const& s)
+            {
+                expect (s=="1" || s=="2" || s=="3");
+                ++cells;
+            }
+            ,[&rows] {
+                rows++;
+            }
+        );
+        expect (head_cells == 3);
+        expect (cells == 3);
+        expect (rows == 2);
+
+        // MOVE BACK (check for move assignment)
+        r = std::move(r2);
+        expect (r.valid());
+        expect (r.cols() == 3);
+        expect (r.rows() == 2);
+        head_cells = 0;
+        cells = 0;
+        rows = 0;
+        r.run([&head_cells] (auto const & s)
+            {
+                expect (s=="One" || s=="Two" || s=="Three");
+                head_cells++;
+            }
+            ,[&cells](auto const& s)
+            {
+                expect (s=="1" || s=="2" || s=="3");
+                ++cells;
+            }
+            ,[&rows]
+            {
+                rows++;
+            }
+        );
+        expect (head_cells == 3);
+        expect (cells == 3);
+        expect (rows == 2);
 
     };
 

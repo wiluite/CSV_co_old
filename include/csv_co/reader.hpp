@@ -487,9 +487,12 @@ namespace csv_co {
             {
                 co_yield e;
             }
-
-            assert(r.length());
-            if (LF != r[r.length()-1])
+#if 0
+            assert(!r.empty()); // TODO: after moving this is false: But! object in "move-from state" - do not use it!
+#else
+            if (!r.empty())
+#endif
+            if (LF != r.back())
             {
                 co_yield '\n';
             }
@@ -501,7 +504,6 @@ namespace csv_co {
         using header_field_callback_type = std::function <void (cell_string const & frame)>;
         using value_field_callback_type = std::function <void (cell_string const & frame)>;
         using new_row_callback_type = std::function <void ()>;
-
 
     private:
         // nullptr by default, or used-default by run(). UB if nullptr
@@ -539,6 +541,12 @@ namespace csv_co {
 
         // let us express C-style string parameter constructor via usual string parameter constructor
         explicit reader (const char * s) : reader(cell_string(s)) {}
+
+        reader (reader const & other) = delete;
+        reader & operator= (reader const & other) = delete;
+
+        reader (reader && other) noexcept = default;
+        reader & operator=(reader && other) noexcept = default;
 
         [[nodiscard]] std::size_t cols() const noexcept
         {

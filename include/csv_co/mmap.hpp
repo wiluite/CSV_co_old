@@ -117,6 +117,8 @@ namespace mio {
         {
             return mapped_length_ - length_;
         }
+        // length_ should be always greater than zero, because file is mapped
+        [[nodiscard]] auto back() const noexcept {return data_[length_-1];};
 
         [[nodiscard]] const_pointer data() const noexcept { return data_; }
 
