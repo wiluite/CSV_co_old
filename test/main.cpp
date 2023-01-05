@@ -403,9 +403,8 @@ int main()
         expect (v2.size() == 10*4);
         expect (v2.front() == "Southborough");
         expect (v2.back() == "42605");
-        int _ = std::stoi (v2.back());
-        expect (_ == 42605);
         
+        expect ( nothrow ([&v2] { expect (std::stoi(v2.back()) == 42605);}));
     };
 
     "Check validity of the csv format"_test = []

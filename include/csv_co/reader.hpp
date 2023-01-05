@@ -50,7 +50,8 @@ namespace csv_co {
 
     using cell_string = std::basic_string<char, std::char_traits<char>,
 #if (IS_MSVC==1)
-            std::pmr::polymorphic_allocator<char>
+            //std::pmr::polymorphic_allocator<char>
+            std::allocator<char>
 #else
             std::allocator<char>
 #endif
