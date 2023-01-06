@@ -354,6 +354,7 @@ namespace csv_co {
                 // fields partly quoted or not-quoted at all
                 // (all must be spared from double quoting)
                 unique_quote(s, Quote::value);
+                TrimPolicy::trim(s);
             }
 
             friend FSM_cell_span reader::parse_cell_span() const ;
