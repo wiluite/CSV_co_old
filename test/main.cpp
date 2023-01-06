@@ -341,7 +341,7 @@ int main()
 
         // depending on line-breaking style, note: reader's trimming  policy is absent
         expect (first_string == "hello, world1!\r" || first_string == "hello, world1!");
-        
+
         expect (rows == 14);
         expect (cells/rows == 6);
 

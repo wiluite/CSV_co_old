@@ -732,10 +732,7 @@ namespace csv_co {
                         if (res->e < range_end)
                         {
                             assert(res->e < range_end);
-
                             auto const delim = *(res->e);
-                            //std::cout << cell_string{res->b, res->e} << std::endl;
-                            //std::cout << delim << std::endl;
                             vfcs_cb(res.value());
                             if (delim == LF)
                             {
@@ -744,22 +741,9 @@ namespace csv_co {
                         } else
                         {
                             assert(res->e == range_end);
-                            std::cout << "here\n";
                             vfcs_cb(res.value());
                             new_row_callback_();
                         }
-//                        std::visit([&](auto&& arg)
-//                        {
-//                            res->e--; // get_rid of limiter
-//                            std::cout << cell_string{res->b, res->e} << std::endl;
-//                            vfcs_cb(res);
-//                        },src);
-//                        vf_cb(res.front()==special?(""):(res.back()!=LF?res:cell_string{res.b(),res.e()-1}));
-//
-//                        if (res.back() == LF)
-//                        {
-//                            new_row_callback_();
-//                        }
                     }
                 }
             }, src);

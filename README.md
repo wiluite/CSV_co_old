@@ -12,7 +12,7 @@ designed to handle field selection transparently. The following requirements see
 - The double quote character in the field must be doubled.
 
 In fact, coroutines and callbacks do not contradict each other, but complement each other if they perform 
-different tasks in one, and when only few callbacks intended for the e-user are.
+different tasks in one, and when only few callbacks intended for the end-user are.
 
 ### Version
 Pre 1.0.0
@@ -41,7 +41,7 @@ To Andreas Fertig for his coroutine tutorials and code that was highly borrowed.
     A. Because I'm not sure that some authors work correctly with quoted fields.
 
     Q. Why are you unboxing/unquoting fields in quotes?
-    A. Because they are for the data processor, not the e-user. Nature of string itself is quoting.
+    A. Because they are for the data processor, not the end-user. Nature of string itself is quoting.
 
 ### Example
 
