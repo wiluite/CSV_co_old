@@ -17,35 +17,48 @@ int main()
 
         using namespace string_functions;
 
-        cell_string s = "\n\t \r123 456 \t\r\n ";
-        alltrim(s);
-        expect(s == R"(123 456)");
-
-        s = "\n\t \r \t\r\n ";
+        cell_string s = "\n\t \r \t\r\n ";
         expect (devastated(s));
 
         s = R"(""Christmas Tree"" is bad food)";
         unique_quote(s, double_quote::value);
         expect (s== R"("Christmas Tree" is bad food)");
 
+        expect (begins_with(s,'"'));
+
+        s = "\n\t \r \"";
+        expect (begins_with(s,'"'));
+
+        s = "\n\t \r (\"";
+        expect (!begins_with(s,'"'));
+
+        std::cout << static_cast<int>('\n') << std::endl;
     };
 
-    "Special [del_last_quote] function"_test = []
+    "Special [del_last] function"_test = []
     {
 
         using namespace string_functions;
 
         cell_string s = R"(qwerty")";
-        del_last_quote(s, R"(")");
+        del_last(s, '"');
         expect (s == "qwerty");
 
         s = "qwerty\"\t\n \r";
-        del_last_quote(s, R"(")");
+        del_last(s, '"');
         expect (s == "qwerty\t\n \r");
 
         s = "qwerty\"\t\n~\r";
-        del_last_quote(s, R"(")");
+        del_last(s, '"');
         expect(s == "qwerty\"\t\n~\r");
+
+        s = " qwe\"rty\"\t\n~\r";
+        del_last(s, '"');
+        expect(s == " qwe\"rty\"\t\n~\r");
+
+        s = " qwe\"rty\"\t\n\r";
+        del_last(s, '"');
+        expect(s == " qwe\"rty\t\n\r");
 
     };
 
@@ -239,7 +252,7 @@ int main()
 
         expect (cells == 5);
         expect (v == std::vector<cell_string>
-                {{"2022"," Mouse",R"( It's a correct use case: "Hello, Christmas Tree!" )",""," 4900,00"}});
+                {{"2022"," Mouse",R"( It's a correct use case: "Hello, Christmas Tree!" )",R"()", R"( 4900,00)"}});
 
     };
 
@@ -328,12 +341,7 @@ int main()
 
         // depending on line-breaking style, note: reader's trimming  policy is absent
         expect (first_string == "hello, world1!\r" || first_string == "hello, world1!");
-
-        // for now let us do trimming manually, just for diversity
-        // that is what the parser does when with a trimming policy
-        string_functions::alltrim(first_string);
-        expect (first_string == "hello, world1!");
-
+        
         expect (rows == 14);
         expect (cells/rows == 6);
 
@@ -484,6 +492,31 @@ int main()
         expect (rows == 2);
 
     };
+
+    "Reader LAZY callback calculates cells from char const *"_test = []
+    {
+
+        auto cells{0u}, rows{0u};
+        //auto rows {0};
+        reader r ("2022, Mouse, \"It's a correct use case: \"\"Hello, Christmas Tree!\"\"\" ,, 4901");
+        r.run_lazy([&] (auto & s)
+              {
+                  //static_assert(std::is_same_v<decltype(s), const reader<>::cell_span&>);
+                  std::string value;
+                  //std::cout << cell_string{s.b, s.e} << std::endl;
+                  s.read_value(value);
+                  ++cells;
+              }
+              , [&rows] {
+                  ++rows;
+              }
+        );
+        // should be R"( It's a correct use case: "Hello, Christmas Tree!" )"
+        expect(cells == 5);
+        expect(rows == 1);
+
+    };
+
 
 }
 

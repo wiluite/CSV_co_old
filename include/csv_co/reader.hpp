@@ -57,12 +57,6 @@ namespace csv_co {
 #endif
             >;
 
-    struct cell_span
-    {
-        typename cell_string::pointer begin;
-        typename cell_string::pointer end;
-    };
-
 
     namespace trim_policy {
         struct no_trimming {
@@ -109,22 +103,21 @@ namespace csv_co {
         { t } -> std::convertible_to<delimiter<T::value>>;
     };
 
-    namespace string_functions {
+    namespace string_functions
+    {
 
-        inline void alltrim (auto & source)
+        inline bool devastated(auto const & s)
         {
-            source.erase(0,source.find_first_not_of(" \n\r\t"));
-            source.erase(source.find_last_not_of(" \n\r\t") + 1);
+            return (s.find_first_not_of(" \n\r\t") == std::string::npos);
         }
 
-        inline bool devastated(auto s)
+        inline bool begins_with(auto const & s, char ch='"' )
         {
-            alltrim(s);
-            return s.empty();
+            auto const d = s.find_first_not_of(" \n\r\t");
+            return (d != std::string::npos && s[d] == ch);
         }
 
-        template <class CHAR_T>
-        inline void del_last_quote (auto & source, CHAR_T ch)
+        inline void del_last (auto & source, char ch='"')
         {
             auto const pos = source.find_last_of(ch);
             assert (pos != std::string::npos);
@@ -148,6 +141,7 @@ namespace csv_co {
             , QuoteConcept Quote = double_quote, DelimiterConcept Delimiter = comma_delimiter>
     class reader
     {
+
         template<typename T, typename G,
                 typename... Bases>
         struct promise_type_base : public Bases... {
@@ -320,7 +314,32 @@ namespace csv_co {
         using FSM = async_generator<cell_string, char>;
         using FSM_cols = async_generator<std::optional<std::size_t>, char>;
         using FSM_rows = async_generator<std::optional<bool>, char>;
+
+        class cell_span;
         using FSM_cell_span = async_generator<std::optional<cell_span>, char>;
+
+        using header_field_callback_type = std::function <void (cell_string const & frame)>;
+        using value_field_callback_type = std::function <void (cell_string const & frame)>;
+
+        using header_field_cell_span_callback_type = std::function <void (cell_span const & frame)>;
+        using value_field_cell_span_callback_type = std::function <void (cell_span const & frame)>;
+
+        using new_row_callback_type = std::function <void ()>;
+
+        class cell_span
+        {
+        private:
+            typename cell_string::const_pointer b;
+            typename cell_string::const_pointer e;
+        public:
+            cell_span (auto b, auto e) : b(b), e(e) {}
+            void read_value(cell_string &) const
+            {
+                std::cout << cell_string{b, e} << std::endl;
+            }
+            friend FSM_cell_span reader::parse_cell_span() const ;
+            friend void reader::run_lazy(reader::value_field_cell_span_callback_type, reader::new_row_callback_type);
+        };
 
         static constexpr char LF{'\n'};
         static constexpr char special{'\0'};
@@ -380,7 +399,7 @@ namespace csv_co {
                         }
                         if (was_devastated)
                         {
-                            del_last_quote(field, Quote::value);
+                            del_last(field, Quote::value);
                         }
                         unique_quote(field, Quote::value);
                         TrimPolicy::trim(field);
@@ -396,6 +415,52 @@ namespace csv_co {
                     continue;
                 }
                 field.push_back(b);
+            }
+        }
+
+        FSM_cell_span parse_cell_span() const
+        {
+            std::optional<cell_span> field;
+
+            std::visit([&](auto&& arg)
+            {
+                field = cell_span {std::addressof(arg[0]), std::addressof(arg[0])};
+            },src );
+
+            for(;;)
+            {
+                auto b = co_await char{};
+                ++field->e;
+                if (limiter(b))
+                {
+                    co_yield field;
+                    field->b = field->e;
+                    continue;
+                }
+                if (Quote::value == b)
+                {
+                    using namespace string_functions;
+
+                    std::size_t quote_counter = 1;
+                    for(;;)
+                    {
+                        b = co_await char{};
+                        ++field->e;
+                        if (!limiter(b))
+                        {
+                            quote_counter += (Quote::value == b) ? 1 : 0;
+                            continue;
+                        }
+                        if (quote_counter % 2)
+                        {
+                            continue;
+                        }
+                        co_yield field;
+                        field->b = field->e;
+                        break;
+                    }
+                    continue;
+                }
             }
         }
 
@@ -508,18 +573,15 @@ namespace csv_co {
 
         std::variant<mio::ro_mmap, cell_string> src;
 
-    public:
-        using header_field_callback_type = std::function <void (cell_string const & frame)>;
-        using value_field_callback_type = std::function <void (cell_string const & frame)>;
-        using new_row_callback_type = std::function <void ()>;
-
-    private:
         // nullptr by default, or used-default by run(). UB if nullptr
-        header_field_callback_type header_field_callback_;
+        header_field_callback_type hf_cb;
         // always user-defined: by run() or UB if user-defined nullptr
-        value_field_callback_type value_field_callback_;
+        value_field_callback_type  vf_cb;
         // defaulted or user-defined by run(), or UB if user-defined nullptr
-        new_row_callback_type new_row_callback_;
+        new_row_callback_type      new_row_callback_;
+
+        header_field_cell_span_callback_type hfcs_cb;
+        value_field_cell_span_callback_type  vfcs_cb;
 
     public:
         using trim_policy_type = TrimPolicy;
@@ -629,20 +691,21 @@ namespace csv_co {
 
         void run(value_field_callback_type fcb, new_row_callback_type nrc=[]{})
         {
-            assert(!header_field_callback_);
-            value_field_callback_ = std::move(fcb);
+            assert(!hf_cb);
+            vf_cb = std::move(fcb);
             new_row_callback_ = std::move(nrc);
-            std::visit([&](auto&& arg) {
+            std::visit([&](auto&& arg)
+            {
                 auto source = sender(arg);
                 auto p = parse();
-                for (const auto &b: source) {
+                for (const auto &b: source)
+                {
                     p.send(b);
-                    if (const auto &res = p(); !res.empty()) {
-                        value_field_callback_(
-                                res.front() == special ? ("") : (res.back() != LF ? res : cell_string{res.begin(),
-                                                                                                      res.end() - 1}));
-
-                        if (res.back() == LF) {
+                    if (const auto &res = p(); !res.empty())
+                    {
+                        vf_cb(res.front()==special?(""):(res.back()!=LF?res:cell_string{res.begin(),res.end()-1}));
+                        if (res.back()==LF)
+                        {
                             new_row_callback_();
                         }
                     }
@@ -650,26 +713,78 @@ namespace csv_co {
             }, src);
         }
 
+        void run_lazy(value_field_cell_span_callback_type fcb, new_row_callback_type nrc=[]{})
+        {
+            //assert(!hf_cb);
+            vfcs_cb = std::move(fcb);
+            new_row_callback_ = std::move(nrc);
+            std::visit([&](auto&& arg)
+            {
+                auto range_end = std::addressof(arg[arg.size()]);
+                auto source = sender(arg);
+                auto p = parse_cell_span();
+                for (const auto &b: source)
+                {
+                    p.send(b);
+                    if (auto res = p(); res.has_value())
+                    {
+                        res->e--;
+                        if (res->e < range_end)
+                        {
+                            assert(res->e < range_end);
+
+                            auto const delim = *(res->e);
+                            //std::cout << cell_string{res->b, res->e} << std::endl;
+                            //std::cout << delim << std::endl;
+                            vfcs_cb(res.value());
+                            if (delim == LF)
+                            {
+                                new_row_callback_();
+                            }
+                        } else
+                        {
+                            assert(res->e == range_end);
+                            std::cout << "here\n";
+                            vfcs_cb(res.value());
+                            new_row_callback_();
+                        }
+//                        std::visit([&](auto&& arg)
+//                        {
+//                            res->e--; // get_rid of limiter
+//                            std::cout << cell_string{res->b, res->e} << std::endl;
+//                            vfcs_cb(res);
+//                        },src);
+//                        vf_cb(res.front()==special?(""):(res.back()!=LF?res:cell_string{res.b(),res.e()-1}));
+//
+//                        if (res.back() == LF)
+//                        {
+//                            new_row_callback_();
+//                        }
+                    }
+                }
+            }, src);
+        }
+
         void run(header_field_callback_type hfcb, value_field_callback_type fcb, new_row_callback_type nrc=[]{})
         {
-            header_field_callback_ = std::move(hfcb);
-            value_field_callback_ = std::move(fcb);
+            hf_cb = std::move(hfcb);
+            vf_cb = std::move(fcb);
             new_row_callback_ = std::move(nrc);
             std::visit([&](auto&& arg) {
                 auto cols1 = cols();
                 auto source = sender(arg);
                 auto p = parse();
                 auto b = source.begin();
-                for (;;) {
+                for (;;)
+                {
                     p.send(*b);
                     ++b;
                     if (const auto &res = p(); !res.empty()) {
-                        header_field_callback_(
-                                res.front() == special ? ("") : (res.back() != LF ? res : cell_string{res.begin(),
-                                                                                                      res.end() - 1}));
+                        hf_cb(res.front()==special?(""):(res.back()!=LF?res:cell_string{res.begin(),res.end() - 1}));
                         --cols1;
                     }
-                    if (!cols1) {
+                    if (!cols1)
+                    {
                         new_row_callback_();
                         break;
                     }
@@ -678,7 +793,7 @@ namespace csv_co {
                     p.send(*b);
                     ++b;
                     if (const auto &res = p(); !res.empty()) {
-                        value_field_callback_(
+                        vf_cb(
                                 res.front() == special ? ("") : (res.back() != LF ? res : cell_string{res.begin(),
                                                                                                       res.end() - 1}));
 
