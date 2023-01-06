@@ -84,7 +84,7 @@ namespace csv_co {
     template <char ch> struct quote_char {
         constexpr static char value = ch;
     };
-    using double_quote = quote_char<'"'>;
+    using quote = quote_char<'"'>;
     template <class T>
     concept QuoteConcept = requires (T t)
     {
@@ -111,24 +111,37 @@ namespace csv_co {
             return (s.find_first_not_of(" \n\r\t") == std::string::npos);
         }
 
-        inline bool begins_with(auto const & s, char ch='"' )
+        inline std::pair<bool,std::size_t> begins_with(auto const & s, char ch='"' )
         {
             auto const d = s.find_first_not_of(" \n\r\t");
-            return (d != std::string::npos && s[d] == ch);
+            return {(d != std::string::npos && s[d] == ch), d};
         }
 
-        inline void del_last (auto & source, char ch='"')
+        inline bool del_last (auto & source, char ch='"')
         {
             auto const pos = source.find_last_of(ch);
             assert (pos != std::string::npos);
             auto const sv = std::string_view (source.begin() + pos + 1, source.end());
             if (devastated(std::decay_t<decltype(source)>{sv.begin(), sv.end()}))
+            {
                 source.erase(pos,1);
+                return true;
+            }
+            return false;
+        }
+
+        inline void unquote(cell_string &s, char ch)
+        {
+            auto const [ret,pos] = begins_with(s, ch);
+            if ((ret) && del_last(s, ch))
+            {
+                s.erase(pos, 1);
+            }
         }
 
         inline void unique_quote (auto & s, char q)
         {
-            auto const last = unique(s.begin(), s.end(), [&q](auto const& first, auto const& second)
+            auto const last = unique(s.begin(), s.end(), [q](auto const& first, auto const& second)
             {
                 return first==q && second==q;
             });
@@ -138,7 +151,7 @@ namespace csv_co {
     }
 
     template <TrimPolicyConcept TrimPolicy = trim_policy::no_trimming
-            , QuoteConcept Quote = double_quote, DelimiterConcept Delimiter = comma_delimiter>
+            , QuoteConcept Quote = quote, DelimiterConcept Delimiter = comma_delimiter>
     class reader
     {
 
@@ -248,8 +261,7 @@ namespace csv_co {
                 if constexpr (
                         std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<std::size_t>> ||
                         std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<bool>> ||
-                        std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<cell_span>>
-                        )
+                        std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<cell_span>> )
                     mCoroHdl.promise().mValue = std::nullopt;
                 else
                     mCoroHdl.promise().mValue.clear();
@@ -333,12 +345,25 @@ namespace csv_co {
             typename cell_string::const_pointer e;
         public:
             cell_span (auto b, auto e) : b(b), e(e) {}
-            void read_value(cell_string &) const
+            void read_value(cell_string & s) const
             {
-                std::cout << cell_string{b, e} << std::endl;
+                using namespace string_functions;
+                s = cell_string {b,e};
+                std::cout <<  s << std::endl;
+                // if field was quoted completely: it must be unquoted
+                unquote(s, Quote::value);
+                std::cout << s << std::endl;
+                // fields partly quoted or not-quoted at all
+                // (all must be spared from double quoting)
+                unique_quote(s, Quote::value);
+                std::cout << s << std::endl;
             }
+
             friend FSM_cell_span reader::parse_cell_span() const ;
-            friend void reader::run_lazy(reader::value_field_cell_span_callback_type, reader::new_row_callback_type);
+            friend void reader::run_lazy(value_field_cell_span_callback_type, new_row_callback_type);
+
+            cell_span (cell_span const &) = default;
+            cell_span& operator= (cell_span const &) = default;
         };
 
         static constexpr char LF{'\n'};
@@ -349,10 +374,12 @@ namespace csv_co {
             return (Delimiter::value == b) || (LF == b);
         }
 
-        inline void overcome_architectural_limitations(auto & s) const
+        inline void dirty_trick(auto & s) const
         {
             if (s.empty())
+            {
                 s.push_back(special);
+            }
         }
 
         FSM parse() const
@@ -364,7 +391,7 @@ namespace csv_co {
                 if (limiter(b))
                 {
                     TrimPolicy::trim(field);
-                    overcome_architectural_limitations(field);
+                    dirty_trick(field);
                     if (LF == b)
                     {
                         field.push_back(LF);
@@ -403,7 +430,7 @@ namespace csv_co {
                         }
                         unique_quote(field, Quote::value);
                         TrimPolicy::trim(field);
-                        overcome_architectural_limitations(field);
+                        dirty_trick(field);
                         if (LF == b)
                         {
                             field.push_back(LF);
@@ -420,32 +447,30 @@ namespace csv_co {
 
         FSM_cell_span parse_cell_span() const
         {
-            std::optional<cell_span> field;
+            std::optional<cell_span> span;
 
             std::visit([&](auto&& arg)
             {
-                field = cell_span {std::addressof(arg[0]), std::addressof(arg[0])};
+                span = cell_span {std::addressof(arg[0]), std::addressof(arg[0])};
             },src );
 
             for(;;)
             {
                 auto b = co_await char{};
-                ++field->e;
+                ++span->e;
                 if (limiter(b))
                 {
-                    co_yield field;
-                    field->b = field->e;
+                    co_yield span;
+                    span->b = span->e;
                     continue;
                 }
                 if (Quote::value == b)
                 {
-                    using namespace string_functions;
-
                     std::size_t quote_counter = 1;
                     for(;;)
                     {
                         b = co_await char{};
-                        ++field->e;
+                        ++span->e;
                         if (!limiter(b))
                         {
                             quote_counter += (Quote::value == b) ? 1 : 0;
@@ -455,8 +480,8 @@ namespace csv_co {
                         {
                             continue;
                         }
-                        co_yield field;
-                        field->b = field->e;
+                        co_yield span;
+                        span->b = span->e;
                         break;
                     }
                     continue;
@@ -561,7 +586,10 @@ namespace csv_co {
                 co_yield e;
             }
 #if 0
-            assert(!r.empty()); // TODO: after moving this is false: But! object in "move-from state" - do not use it!
+            // TODO: after moving this is false:
+            // But! object in "move-from state" - do not use it!
+            // Make valid method exception throwing
+            assert(!r.empty());
 #else
             if (!r.empty())
 #endif
@@ -664,9 +692,9 @@ namespace csv_co {
         [[nodiscard]] bool valid() const noexcept
         {
             auto result {false};
-            std::optional<std::size_t> curr_cols = std::nullopt;
             std::visit([&](auto&& arg)
             {
+                std::optional<std::size_t> curr_cols;
                 auto source = sender(arg);
                 auto p = parse_cols();
                 for(const auto& b : source)
@@ -685,7 +713,6 @@ namespace csv_co {
                     }
                 }
             }, src);
-
             return result;
         }
 
@@ -715,7 +742,6 @@ namespace csv_co {
 
         void run_lazy(value_field_cell_span_callback_type fcb, new_row_callback_type nrc=[]{})
         {
-            //assert(!hf_cb);
             vfcs_cb = std::move(fcb);
             new_row_callback_ = std::move(nrc);
             std::visit([&](auto&& arg)
@@ -728,8 +754,7 @@ namespace csv_co {
                     p.send(b);
                     if (auto res = p(); res.has_value())
                     {
-                        res->e--;
-                        if (res->e < range_end)
+                        if (--res->e < range_end)
                         {
                             assert(res->e < range_end);
                             auto const delim = *(res->e);
@@ -738,7 +763,7 @@ namespace csv_co {
                             {
                                 new_row_callback_();
                             }
-                        } else
+                        } else // ultimate LF
                         {
                             assert(res->e == range_end);
                             vfcs_cb(res.value());
@@ -754,7 +779,8 @@ namespace csv_co {
             hf_cb = std::move(hfcb);
             vf_cb = std::move(fcb);
             new_row_callback_ = std::move(nrc);
-            std::visit([&](auto&& arg) {
+            std::visit([&](auto&& arg)
+            {
                 auto cols1 = cols();
                 auto source = sender(arg);
                 auto p = parse();
@@ -763,7 +789,8 @@ namespace csv_co {
                 {
                     p.send(*b);
                     ++b;
-                    if (const auto &res = p(); !res.empty()) {
+                    if (const auto &res = p(); !res.empty())
+                    {
                         hf_cb(res.front()==special?(""):(res.back()!=LF?res:cell_string{res.begin(),res.end() - 1}));
                         --cols1;
                     }
@@ -776,12 +803,12 @@ namespace csv_co {
                 while (b != source.end()) {
                     p.send(*b);
                     ++b;
-                    if (const auto &res = p(); !res.empty()) {
-                        vf_cb(
-                                res.front() == special ? ("") : (res.back() != LF ? res : cell_string{res.begin(),
-                                                                                                      res.end() - 1}));
+                    if (const auto &res = p(); !res.empty())
+                    {
+                        vf_cb(res.front()==special?(""):(res.back()!=LF?res:cell_string{res.begin(),res.end() - 1}));
 
-                        if (res.back() == LF) {
+                        if (res.back() == LF)
+                        {
                             new_row_callback_();
                         }
                     }

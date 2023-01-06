@@ -21,18 +21,26 @@ int main()
         expect (devastated(s));
 
         s = R"(""Christmas Tree"" is bad food)";
-        unique_quote(s, double_quote::value);
+        unique_quote(s, quote::value);
         expect (s== R"("Christmas Tree" is bad food)");
-
-        expect (begins_with(s,'"'));
+        auto [a, b] = begins_with(s,'"');
+        expect(a);
+        expect(b==0);
 
         s = "\n\t \r \"";
-        expect (begins_with(s,'"'));
+        auto [c,d] = begins_with(s,'"');
+        expect(c);
+        expect(d==5);
 
         s = "\n\t \r (\"";
-        expect (!begins_with(s,'"'));
+        auto [e,f] = begins_with(s,'"');
+        expect(!e);
+        expect(d == 5);
 
-        std::cout << static_cast<int>('\n') << std::endl;
+        s = "    \"wwww \" ";
+        unquote(s,'"');
+        expect (s == "    wwww  ");
+
     };
 
     "Special [del_last] function"_test = []
@@ -41,23 +49,23 @@ int main()
         using namespace string_functions;
 
         cell_string s = R"(qwerty")";
-        del_last(s, '"');
+        expect (del_last(s, '"'));
         expect (s == "qwerty");
 
         s = "qwerty\"\t\n \r";
-        del_last(s, '"');
+        expect(del_last(s, '"'));
         expect (s == "qwerty\t\n \r");
 
         s = "qwerty\"\t\n~\r";
-        del_last(s, '"');
+        expect(!del_last(s, '"'));
         expect(s == "qwerty\"\t\n~\r");
 
         s = " qwe\"rty\"\t\n~\r";
-        del_last(s, '"');
+        expect(!del_last(s, '"'));
         expect(s == " qwe\"rty\"\t\n~\r");
 
         s = " qwe\"rty\"\t\n\r";
-        del_last(s, '"');
+        expect(del_last(s, '"'));
         expect(s == " qwe\"rty\t\n\r");
 
     };
@@ -91,7 +99,6 @@ int main()
         expect(cells == 6);
 
     };
-
 
     "Reader callbacks calculate cols and rows"_test = []
     {
@@ -190,7 +197,7 @@ int main()
 
         using new_delimiter = delimiter<';'>;
 
-        reader<trim_policy::no_trimming, double_quote, new_delimiter> r ("one;two;three\nfour;five;six");
+        reader<trim_policy::no_trimming, quote, new_delimiter> r ("one;two;three\nfour;five;six");
         r.run([&](auto & s)
               {
                   v.push_back(s);
@@ -497,24 +504,25 @@ int main()
     {
 
         auto cells{0u}, rows{0u};
-        //auto rows {0};
-        reader r ("2022, Mouse, \"It's a correct use case: \"\"Hello, Christmas Tree!\"\"\" ,, 4901");
+
+        std::vector<cell_string> v;
+        reader r (R"(2022 , Mouse , "It's a correct use case: ""Hello, Christmas Tree!""" ,," 4901")");
         r.run_lazy([&] (auto & s)
               {
-                  //static_assert(std::is_same_v<decltype(s), const reader<>::cell_span&>);
                   std::string value;
-                  //std::cout << cell_string{s.b, s.e} << std::endl;
                   s.read_value(value);
+                  v.push_back(value);
                   ++cells;
               }
               , [&rows] {
                   ++rows;
               }
         );
-        // should be R"( It's a correct use case: "Hello, Christmas Tree!" )"
+
         expect(cells == 5);
         expect(rows == 1);
-
+        expect(v == std::vector<cell_string>{"2022 "," Mouse ",
+                                             R"( It's a correct use case: "Hello, Christmas Tree!" )",""," 4901"});
     };
 
 
