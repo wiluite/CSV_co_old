@@ -349,14 +349,11 @@ namespace csv_co {
             {
                 using namespace string_functions;
                 s = cell_string {b,e};
-                std::cout <<  s << std::endl;
                 // if field was quoted completely: it must be unquoted
                 unquote(s, Quote::value);
-                std::cout << s << std::endl;
                 // fields partly quoted or not-quoted at all
                 // (all must be spared from double quoting)
                 unique_quote(s, Quote::value);
-                std::cout << s << std::endl;
             }
 
             friend FSM_cell_span reader::parse_cell_span() const ;
@@ -781,7 +778,7 @@ namespace csv_co {
             new_row_callback_ = std::move(nrc);
             std::visit([&](auto&& arg)
             {
-                auto cols1 = cols();
+                auto columns = cols();
                 auto source = sender(arg);
                 auto p = parse();
                 auto b = source.begin();
@@ -792,15 +789,16 @@ namespace csv_co {
                     if (const auto &res = p(); !res.empty())
                     {
                         hf_cb(res.front()==special?(""):(res.back()!=LF?res:cell_string{res.begin(),res.end() - 1}));
-                        --cols1;
+                        --columns;
                     }
-                    if (!cols1)
+                    if (!columns)
                     {
                         new_row_callback_();
                         break;
                     }
                 }
-                while (b != source.end()) {
+                while (b != source.end())
+                {
                     p.send(*b);
                     ++b;
                     if (const auto &res = p(); !res.empty())
