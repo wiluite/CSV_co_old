@@ -431,6 +431,9 @@ int main()
         expect(throws([](){auto & _ = reader("1,2,3\n4,5,6,7\n").valid(); }));
         expect(throws([](){auto & _ = reader("1,2,3\n4,5,6\n7\n").valid(); }));
         expect(nothrow([](){auto & _ = reader("1,2,3\n4,5, 6\n7,8,9").valid(); }));
+
+        expect(throws([] {auto & _ = reader
+        (std::filesystem::path ("game-invalid-format.csv")).valid();}));
     };
 
     // -- Topic change: Move Operations --
@@ -495,29 +498,74 @@ int main()
 
     };
 
-    "Reader LAZY callback calculates cells from char const *"_test = []
+    "Reader LAZY callbacks process hard quoted fields"_test = []
     {
 
-        auto cells{0u}, rows{0u};
+        {
+            auto cells{0u}, rows{0u};
+            std::vector<cell_string> v;
+            reader r (R"( "It's a correct use case: ""Hello, Christmas Tree!""" )");
+            r.run_lazy([&] (auto & s)
+                       {
+                           std::string value;
+                           s.read_value(value);
+                           v.push_back(value);
+                           ++cells;
+                       }
+                       , [&rows] {
+                           ++rows;
+                       }
+            );
 
-        std::vector<cell_string> v;
-        reader r (R"(2022 , Mouse , "It's a correct use case: ""Hello, Christmas Tree!""" ,," 4901")");
-        r.run_lazy([&] (auto & s)
-              {
-                  std::string value;
-                  s.read_value(value);
-                  v.push_back(value);
-                  ++cells;
-              }
-              , [&rows] {
-                  ++rows;
-              }
-        );
+            expect(cells == 1);
+            expect(rows == 1);
+            expect(v == std::vector<cell_string>{R"( It's a correct use case: "Hello, Christmas Tree!" )"});
+        }
 
-        expect(cells == 5);
-        expect(rows == 1);
-        expect(v == std::vector<cell_string>{"2022 "," Mouse ",
-                                             R"( It's a correct use case: "Hello, Christmas Tree!" )",""," 4901"});
+        {
+            std::vector<cell_string> v;
+            reader r (R"( "quoted from the beginning, only" with usual rest part)");
+            r.run_lazy([&] (auto & s)
+                       {
+                           cell_string value;
+                           s.read_value(value);
+                           v.push_back(value);
+                       }
+            );
+            expect (v == std::vector<cell_string>{R"( "quoted from the beginning, only" with usual rest part)"});
+
+        }
+
+        {
+            std::vector<cell_string> v;
+            reader r (R"( " quoted from the beginning, only (with inner ""a , b"") " with usual rest part)");
+            r.run_lazy([&] (auto & s)
+                       {
+                           cell_string value;
+                           s.read_value(value);
+                           v.push_back(value);
+                       }
+            );
+            expect (v == std::vector<cell_string>
+                    {R"( " quoted from the beginning, only (with inner "a , b") " with usual rest part)"});
+
+        }
+
+        {
+            std::vector<cell_string> v;
+            reader r (R"( quoted in the "middle, only (with inner ""a , b"") " with usual rest part)");
+            r.run_lazy([&] (auto & s)
+                       {
+                           cell_string value;
+                           s.read_value(value);
+                           v.push_back(value);
+                       }
+            );
+            expect (v == std::vector<cell_string>
+                    {R"( quoted in the "middle, only (with inner "a , b") " with usual rest part)"});
+
+        }
+
     };
 
 

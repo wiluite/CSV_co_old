@@ -35,14 +35,17 @@ Pre 1.0.0
   - MinGW with GCC 10.2 C++ compiler
 
 ### Acknowledgments
-To Andreas Fertig for his coroutine tutorials and code that was highly borrowed.
+To Andreas Fertig for coroutine tutorials and code that was highly borrowed.
 
 ### FAQ
     Q. Why another parser?
-    A. Because I'm not sure that some authors work correctly with quoted fields.
+    A. Because I don't think some authors work correctly with quoted fields.
 
-    Q. Why are you unboxing/unquoting fields in quotes?
-    A. Because they are for the data processor, not the end-user. Nature of string itself is quoting.
+    Q. Why are you unquoting quoted fields?
+    A. Because quotes are for data processors, not the end-user. String itself is quoted.
+
+    Q. How fast is it?
+    A. Read benchmarks chapter, please.
 
 ### Example
 Energetic mode, iterate over all fields, general scheme:
@@ -83,8 +86,7 @@ Energetic mode, save all fields to a container and view a data:
 
 Energetic mode, use 'new row' callback to facilitate filling a matrix:
 ```cpp
-    try
-    {
+    try {
         reader<trim_policy::alltrim> r (std::filesystem::path ("smallpop.csv"));
         some_matrix_class matrix (shape);
         
