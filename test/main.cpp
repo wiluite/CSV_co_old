@@ -424,18 +424,13 @@ int main()
     // -- Topic change: Check Validity --
     "Check validity of the csv format"_test = []
     {
-
-        expect (reader ("1,2,3\n").valid());
-        expect (!reader ("1,2,3\n4\n").valid());
-        expect (!reader ("1,2,3\n4,5\n").valid());
-        expect (reader ("1,2,3\n4,5,6\n").valid());
-        expect (!reader ("1,2,3\n4,5,6,7\n").valid());
-        expect (!reader ("1,2,3\n4,5,6\n7").valid());
-        expect (reader ("1,2,3\n4,5,6\n7,8,9").valid());
-
-        expect (reader (std::filesystem::path ("smallpop.csv")).valid());
-        expect (!reader (std::filesystem::path ("game-invalid-format.csv")).valid());
-
+        expect(nothrow([](){auto & _ = reader("1,2,3\n").valid(); }));
+        expect(throws([](){auto & _ = reader("1,2,3\n4\n").valid(); }));
+        expect(throws([](){auto & _ = reader("1,2,3\n4,5\n").valid(); }));
+        expect(nothrow([](){auto & _ = reader("1,2,3\n4,5, 6").valid(); }));
+        expect(throws([](){auto & _ = reader("1,2,3\n4,5,6,7\n").valid(); }));
+        expect(throws([](){auto & _ = reader("1,2,3\n4,5,6\n7\n").valid(); }));
+        expect(nothrow([](){auto & _ = reader("1,2,3\n4,5, 6\n7,8,9").valid(); }));
     };
 
     // -- Topic change: Move Operations --
@@ -444,10 +439,10 @@ int main()
 
         reader r ("One,Two,Three\n1,2,3\n");
         reader r2 = std::move(r);
-        //---- r is in Move-From State. We must not touch it, wait for destruction, but let us risk:
-        expect (!r.valid());
+        //---- r is in Move-From State:
+        expect(throws([&r](){auto & _ = r.valid(); }));
         //-------------------------------------
-        expect (r2.valid());
+        expect(nothrow([&r2](){auto & _ = r2.valid(); }));
         expect (r2.cols() == 3);
         expect (r2.rows() == 2);
         auto head_cells{0u};
@@ -473,7 +468,7 @@ int main()
 
         // MOVE BACK (check for move assignment)
         r = std::move(r2);
-        expect (r.valid());
+        expect(nothrow([&r](){auto & _ = r.valid(); }));
         expect (r.cols() == 3);
         expect (r.rows() == 2);
         head_cells = 0;

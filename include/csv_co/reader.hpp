@@ -621,7 +621,7 @@ namespace csv_co {
             std::get<0>(src).map(fp.string().c_str(), mmap_error);
             if (mmap_error)
             {
-                throw exception ("Exception! ", mmap_error.message(),' ', fp.string());
+                throw exception ("Exception! ", mmap_error.message(), " : ", fp.string());
             }
         }
 
@@ -687,11 +687,12 @@ namespace csv_co {
             return rows;
         }
 
-        [[nodiscard]] bool valid() const noexcept
+        [[nodiscard]] reader& valid()
         {
-            auto result {false};
+
             std::visit([&](auto&& arg)
             {
+                auto result {false};
                 std::optional<std::size_t> curr_cols;
                 auto source = sender(arg);
                 auto p = parse_cols();
@@ -706,12 +707,16 @@ namespace csv_co {
                             result = true; // if no more lines but this - stay valid!
                         } else
                         {
-                            if (!(result = (curr_cols.value() == res.value()))) { return;}
+                            if (!(result = (curr_cols.value() == res.value()))) {
+                                throw exception ("Exception! ", "Incorrect CSV source format");
+                            }
                         }
                     }
                 }
+                if (!result) throw exception ("Exception ", "Move-from state?");
             }, src);
-            return result;
+
+            return *this;
         }
 
         void run(value_field_callback_type fcb, new_row_callback_type nrc=[]{})

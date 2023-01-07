@@ -1,10 +1,16 @@
 include_directories(../include)
 
-add_executable(file2matrix file2matrix.cpp)
+add_executable(CSV_To_matrix CSV_To_matrix.cpp)
+add_executable(CSV_To_RAM CSV_To_RAM.cpp)
 
 add_custom_command(
-        TARGET file2matrix POST_BUILD
+        TARGET CSV_To_matrix POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy
-        ${CMAKE_SOURCE_DIR}/example/uspop.csv
-        ${CMAKE_CURRENT_BINARY_DIR}/uspop.csv)
+        ${CMAKE_SOURCE_DIR}/example/smallpop.csv
+        ${CMAKE_CURRENT_BINARY_DIR}/smallpop.csv)
 
+add_custom_command(
+        TARGET CSV_To_RAM POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_SOURCE_DIR}/example/smallpop.csv
+        ${CMAKE_CURRENT_BINARY_DIR}/smallpop.csv)

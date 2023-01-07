@@ -18,11 +18,12 @@ different tasks in one, and when only few callbacks intended for the end-user ar
 Pre 1.0.0
 
 ### Features
-- Currently only energetic (not lazy) mode of iteration.
-- Callbacks for each field/cell (header's or value)
+- Memory-mapping of CSV files.
+- Both energetic and lazy modes of bypass.
+- Callbacks for each field/cell (header's or value).
 - Callbacks for new rows.
 - String data types only, apply lexical cast transformations yourself.
-- Strong typed (concept-based) reader template parameters
+- Strong typed (concept-based) reader template parameters.
 
 ### Minimum Supported Compilers
 - Linux
@@ -44,6 +45,61 @@ To Andreas Fertig for his coroutine tutorials and code that was highly borrowed.
     A. Because they are for the data processor, not the end-user. Nature of string itself is quoting.
 
 ### Example
+Energetic mode, iterate over all fields, general scheme:
+```cpp
+    #include <csv_co/reader.hpp>
+
+    using namespace csv_co;
+    using reader_type = reader< trimming_policy >;
+    
+    reader_type r( CSV_source );
+    r.run([](auto & s) {
+        // do something with field string
+    });
+```
+
+Energetic mode, save all fields to a container and view a data:
+```cpp
+  try {
+        reader_type r(std::filesystem::path("smallpop.csv"));
+        std::vector<cell_string> ram;
+        ram.reserve(r.cols() * r.rows());
+        r.valid().run( // check validity and run
+        [](auto) {
+            // ignore header fields
+        }
+        ,[&ram](auto s) {
+            // save value fields
+            ram.push_back(std::move(s));
+        });
+        // population of Southborough,MA:
+        std::cout << ram [0] << ',' << ram[1] << ':' << ram[3] << '\n';
+
+    } catch (reader_type::exception const & e)
+    {
+        std::cout << e.what() << '\n';
+    }
+```
+
+Energetic mode, use 'new row' callback to facilitate filling a matrix:
+```cpp
+    try
+    {
+        reader<trim_policy::alltrim> r (std::filesystem::path ("smallpop.csv"));
+        some_matrix_class matrix (shape);
+        
+        auto c_row {-1}; // will be incremented automatically
+        auto c_col {0u};
+
+        // ignore header fields, obtain value fields, and trace rows:
+        r.run([](auto) {}                                   
+              ,[&](auto & s){ matrix[c_row][c_col++] = s; } 
+              ,[&]{ c_row++; c_col = 0; });                 
+
+        // population of Southborough,MA
+        std::cout << matrix[0][0] << ',' << matrix[0][1] << ':' << matrix[0][3] << '\n';
+    } catch (reader_type::exception const & e) {/* handler */}
+```
 
 ### Problems
 
