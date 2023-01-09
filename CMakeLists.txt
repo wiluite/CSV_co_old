@@ -9,15 +9,30 @@ project(csv_co)
 set(CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
 
+option (WITH_SANITY_CHECK "Build all with Clang sanitizers" OFF)
+option (CLANG_STDLIB_LIBCPP "Build all with Clang STL" ON)
+
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
 if (NOT MSVC)
-    set(CMAKE_CXX_FLAGS "-Wall -Wextra")
     set(CMAKE_CXX_FLAGS_DEBUG "-g")
-    set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native")
 endif()
+
+if ((WITH_SANITY_CHECK) AND (UNIX) AND (NOT (CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")))
+    set (COMPILER_DEFINES "#define SANITY_CHECK")
+    set (SANITY_COMPILE_FLAGS "-fsanitize=address,leak")
+    set (SANITY_LINK_FLAGS "-fsanitize=address,leak")
+endif()
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/include/config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/include/config.h)
+
+if ((CLANG_STDLIB_LIBCPP) AND (UNIX) AND (NOT (CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")))
+    set (STDLIB_COMPILE_FLAGS "-stdlib=libc++")
+    set (STDLIB_LINK_FLAGS "-stdlib=libc++")
+endif()
+
 
 function(check_compiler COMPILER version)
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "${COMPILER}")
@@ -81,13 +96,20 @@ else()
     add_definitions(-Wno-unused-parameter)
     add_definitions(-Wno-unused-value)
     add_definitions(-Wno-cpp)
+    
 
     if(IS_CLANG)
         add_definitions(-Wno-unused-private-field)
         add_definitions(-Wno-unneeded-internal-declaration)
+        add_definitions(${SANITY_COMPILE_FLAGS})
+        add_link_options(${SANITY_LINK_FLAGS})
+        add_definitions(${STDLIB_COMPILE_FLAGS})
+        add_link_options(${STDLIB_LINK_FLAGS})
 
     else()
         add_definitions(-fcoroutines) # required for GCC-10
+        add_definitions(${SANITY_COMPILE_FLAGS})
+        add_link_options(${SANITY_LINK_FLAGS})
 
     endif()
 endif()
@@ -95,3 +117,4 @@ endif()
 
 add_subdirectory(test)
 add_subdirectory(example)
+add_subdirectory(benchmark)

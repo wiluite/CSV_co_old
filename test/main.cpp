@@ -424,16 +424,16 @@ int main()
     // -- Topic change: Check Validity --
     "Check validity of the csv format"_test = []
     {
-        expect(nothrow([](){auto & _ = reader("1,2,3\n").valid(); }));
-        expect(throws([](){auto & _ = reader("1,2,3\n4\n").valid(); }));
-        expect(throws([](){auto & _ = reader("1,2,3\n4,5\n").valid(); }));
-        expect(nothrow([](){auto & _ = reader("1,2,3\n4,5, 6").valid(); }));
-        expect(throws([](){auto & _ = reader("1,2,3\n4,5,6,7\n").valid(); }));
-        expect(throws([](){auto & _ = reader("1,2,3\n4,5,6\n7\n").valid(); }));
-        expect(nothrow([](){auto & _ = reader("1,2,3\n4,5, 6\n7,8,9").valid(); }));
+        expect(nothrow([](){auto & _ = reader("1,2,3\n").valid(); (void)_; }));
+        expect(throws([](){auto & _ = reader("1,2,3\n4\n").valid(); (void)_;}));
+        expect(throws([](){auto & _ = reader("1,2,3\n4,5\n").valid(); (void)_;}));
+        expect(nothrow([](){auto & _ = reader("1,2,3\n4,5, 6").valid(); (void)_;}));
+        expect(throws([](){auto & _ = reader("1,2,3\n4,5,6,7\n").valid(); (void)_;}));
+        expect(throws([](){auto & _ = reader("1,2,3\n4,5,6\n7\n").valid(); (void)_;}));
+        expect(nothrow([](){auto & _ = reader("1,2,3\n4,5, 6\n7,8,9").valid(); (void)_;}));
 
         expect(throws([] {auto & _ = reader
-        (std::filesystem::path ("game-invalid-format.csv")).valid();}));
+        (std::filesystem::path ("game-invalid-format.csv")).valid(); (void)_;}));
     };
 
     // -- Topic change: Move Operations --
@@ -443,9 +443,11 @@ int main()
         reader r ("One,Two,Three\n1,2,3\n");
         reader r2 = std::move(r);
         //---- r is in Move-From State:
-        expect(throws([&r](){auto & _ = r.valid(); }));
+        expect(throws([&r](){auto & _ = r.valid(); (void)_;}));
+        expect (r.cols() == 0);
+        expect (r.rows() == 0);
         //-------------------------------------
-        expect(nothrow([&r2](){auto & _ = r2.valid(); }));
+        expect(nothrow([&r2](){auto & _ = r2.valid(); (void)_;}));
         expect (r2.cols() == 3);
         expect (r2.rows() == 2);
         auto head_cells{0u};
@@ -471,7 +473,7 @@ int main()
 
         // MOVE BACK (check for move assignment)
         r = std::move(r2);
-        expect(nothrow([&r](){auto & _ = r.valid(); }));
+        expect(nothrow([&r](){auto & _ = r.valid(); (void)_;}));
         expect (r.cols() == 3);
         expect (r.rows() == 2);
         head_cells = 0;

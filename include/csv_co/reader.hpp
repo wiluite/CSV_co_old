@@ -67,7 +67,8 @@ namespace csv_co {
         template <char const * list>
         struct trimming {
         public:
-            static void trim (cell_string & s) {
+            static void trim (cell_string & s)
+            {
                 s.erase(0,s.find_first_not_of(list));
                 s.erase(s.find_last_not_of(list)+1);
             }
@@ -106,40 +107,45 @@ namespace csv_co {
     namespace string_functions
     {
 
-        inline bool devastated(auto const & s)
+        bool
+        inline
+        devastated(auto const & s)
         {
             return (s.find_first_not_of(" \n\r\t") == std::string::npos);
         }
 
-        inline std::pair<bool,std::size_t> begins_with(auto const & s, char ch='"' )
+        std::pair<bool,std::size_t>
+        inline
+        begins_with(auto const & s, char ch='"' )
         {
             auto const d = s.find_first_not_of(" \n\r\t");
             return {(d != std::string::npos && s[d] == ch), d};
         }
 
-        inline bool del_last (auto & source, char ch='"')
+        bool
+        inline
+        del_last (auto & source, char ch='"')
         {
             auto const pos = source.find_last_of(ch);
             assert (pos != std::string::npos);
             auto const sv = std::string_view (source.begin() + pos + 1, source.end());
-            if (devastated(std::decay_t<decltype(source)>{sv.begin(), sv.end()}))
-            {
-                source.erase(pos,1);
-                return true;
-            }
-            return false;
+            return devastated(std::decay_t<decltype(source)>{sv.begin(), sv.end()}) && (source.erase(pos, 1), true);
         }
 
-        inline void unquote(cell_string &s, char ch)
+        void
+        inline
+        unquote(cell_string &s, char ch)
         {
             auto const [ret,pos] = begins_with(s, ch);
-            if ((ret) && del_last(s, ch))
+            if (ret && del_last(s, ch))
             {
                 s.erase(pos, 1);
             }
         }
 
-        inline void unique_quote (auto & s, char q)
+        void
+        inline
+        unique_quote (auto & s, char q)
         {
             auto const last = unique(s.begin(), s.end(), [q](auto const& first, auto const& second)
             {
@@ -236,7 +242,7 @@ namespace csv_co {
 
                 T await_resume()
                 {
-                    assert(mRecentSignal.has_value());
+                    //assert(mRecentSignal.has_value());
                     auto tmp = *mRecentSignal;
                     mRecentSignal.reset();
                     return tmp;
@@ -258,13 +264,15 @@ namespace csv_co {
             T operator()()
             {
                 auto tmp{std::move(mCoroHdl.promise().mValue)};
-                if constexpr (
+                    if constexpr (
                         std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<std::size_t>> ||
                         std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<bool>> ||
                         std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<cell_span>> )
-                    mCoroHdl.promise().mValue = std::nullopt;
-                else
-                    mCoroHdl.promise().mValue.clear();
+                        mCoroHdl.promise().mValue = std::nullopt;
+                    else
+                    if constexpr (std::is_same_v<decltype(mCoroHdl.promise().mValue), cell_span> )
+                        mCoroHdl.promise().mValue = cell_span{};
+                    else mCoroHdl.promise().mValue.clear();
                 return tmp;
             }
 
@@ -328,7 +336,8 @@ namespace csv_co {
         using FSM_rows = async_generator<std::optional<bool>, char>;
 
         class cell_span;
-        using FSM_cell_span = async_generator<std::optional<cell_span>, char>;
+
+        using FSM_cell_span = async_generator<cell_span, char>;
 
         using header_field_cb_t = std::function <void (cell_string const & frame)>;
         using value_field_cb_t = std::function <void (cell_string const & frame)>;
@@ -344,21 +353,27 @@ namespace csv_co {
             typename cell_string::const_pointer b;
             typename cell_string::const_pointer e;
         public:
+            cell_span() : b(nullptr), e(nullptr) {}
             cell_span (auto b, auto e) : b(b), e(e) {}
             void read_value(cell_string & s) const
             {
+                assert(b!=nullptr && e!=nullptr);
                 using namespace string_functions;
-                s = cell_string {b,e};
-                // if field was quoted completely: it must be unquoted
+
+                // obtain almost result string in its guaranteed sufficient space
+                s = cell_string {b,e}; // automatically reserved necessary space.
+
+                // if the field was (completely) quoted -> it must be unquoted
                 unquote(s, Quote::value);
-                // fields partly quoted or not-quoted at all
-                // (all must be spared from double quoting)
+
+                // fields partly quoted or not-quoted at all: all must be spared from double quoting
                 unique_quote(s, Quote::value);
                 TrimPolicy::trim(s);
             }
+            inline bool operator()() const noexcept { return (b != nullptr); }
 
-            friend FSM_cell_span reader::parse_cell_span() const ;
-            friend void reader::run_lazy(value_field_cell_span_cb_t, new_row_callback_type);
+            friend FSM_cell_span reader::parse_cell_span() const noexcept;
+            friend void reader::run_lazy(value_field_cell_span_cb_t, new_row_callback_type) const noexcept;
 
             cell_span (cell_span const &) = default;
             cell_span& operator= (cell_span const &) = default;
@@ -442,49 +457,51 @@ namespace csv_co {
                 field.push_back(b);
             }
         }
-
-        FSM_cell_span parse_cell_span() const
+        
+        FSM_cell_span parse_cell_span() const noexcept
         {
-            std::optional<cell_span> span;
+            cell_span noopt_span;
 
             std::visit([&](auto&& arg)
             {
-                span = cell_span {std::addressof(arg[0]), std::addressof(arg[0])};
+                noopt_span = {std::addressof(arg[0]), std::addressof(arg[0])};
             },src );
 
-            for(;;)
+            do
             {
                 auto b = co_await char{};
-                ++span->e;
+                ++noopt_span.e;
                 if (limiter(b))
                 {
-                    co_yield span;
-                    span->b = span->e;
+                    co_yield noopt_span;
+                    noopt_span.b = noopt_span.e;
                     continue;
                 }
                 if (Quote::value == b)
                 {
-                    std::size_t quote_counter = 1;
+                    unsigned quote_counter = 1;
                     for(;;)
                     {
                         b = co_await char{};
-                        ++span->e;
+                        ++noopt_span.e;
                         if (!limiter(b))
                         {
-                            quote_counter += (Quote::value == b) ? 1 : 0;
+                            if (Quote::value == b)
+                                ++quote_counter;
                             continue;
                         }
-                        if (quote_counter % 2)
+                        if (quote_counter & 1)
                         {
                             continue;
                         }
-                        co_yield span;
-                        span->b = span->e;
+
+                        co_yield noopt_span;
+                        noopt_span.b = noopt_span.e;
                         break;
                     }
                     continue;
                 }
-            }
+            } while(true);
         }
 
         FSM_cols parse_cols() const
@@ -586,7 +603,6 @@ namespace csv_co {
 #if 0
             // TODO: after moving this is false:
             // But! object in "move-from state" - do not use it!
-            // Make valid method exception throwing
             assert(!r.empty());
 #else
             if (!r.empty())
@@ -604,10 +620,10 @@ namespace csv_co {
         // always user-defined: by run() or UB if user-defined nullptr
         value_field_cb_t  vf_cb;
         // defaulted or user-defined by run(), or UB if user-defined nullptr
-        new_row_callback_type      new_row_callback_;
+        mutable new_row_callback_type new_row_callback_;
 
         header_field_cell_span_cb_t hfcs_cb;
-        value_field_cell_span_cb_t  vfcs_cb;
+        mutable value_field_cell_span_cb_t  vfcs_cb;
 
     public:
         using trim_policy_type = TrimPolicy;
@@ -706,7 +722,8 @@ namespace csv_co {
                             result = true; // if no more lines but this - stay valid!
                         } else
                         {
-                            if (!(result = (curr_cols.value() == res.value()))) {
+                            if (!(result = (curr_cols.value() == res.value())))
+                            {
                                 throw exception ("Incorrect CSV source format");
                             }
                         }
@@ -720,7 +737,6 @@ namespace csv_co {
 
         void run(value_field_cb_t fcb, new_row_callback_type nrc=[]{})
         {
-            assert(!hf_cb);
             vf_cb = std::move(fcb);
             new_row_callback_ = std::move(nrc);
             std::visit([&](auto&& arg)
@@ -742,30 +758,30 @@ namespace csv_co {
             }, src);
         }
 
-        void run_lazy(value_field_cell_span_cb_t fcb, new_row_callback_type nrc=[]{})
+        void run_lazy(value_field_cell_span_cb_t fcb, new_row_callback_type nrc=[]{}) const noexcept
         {
             vfcs_cb = std::move(fcb);
             new_row_callback_ = std::move(nrc);
-            std::visit([&](auto&& arg)
+            std::visit([&](auto&& arg) noexcept
             {
                 auto range_end = std::addressof(arg[arg.size()]);
                 auto source = sender(arg);
                 auto p = parse_cell_span();
-                for (const auto &b: source)
+                for (const auto & b: source)
                 {
                     p.send(b);
-                    if (auto res = p(); res.has_value())
+                    if (auto res = p(); res())
                     {
-                        if (--res->e < range_end)
+                        if (--res.e < range_end)
                         {
-                            vfcs_cb(res.value());
-                            if (*(res->e) == LF)
+                            vfcs_cb(res);
+                            if (*(res.e) == LF)
                             {
                                 new_row_callback_();
                             }
                         } else // ultimate LF
                         {
-                            vfcs_cb(res.value());
+                            vfcs_cb(res);
                             new_row_callback_();
                         }
                     }
@@ -813,48 +829,47 @@ namespace csv_co {
             }, src);
         }
 
-        void run_lazy(header_field_cell_span_cb_t hfcb, value_field_cell_span_cb_t fcb, new_row_callback_type nrc=[]{})
-        {
-            hfcs_cb = std::move(hfcb);
-            vfcs_cb = std::move(fcb);
-            new_row_callback_ = std::move(nrc);
-            std::visit([&](auto&& arg)
-            {
-                auto columns = cols();
-                auto range_end = std::addressof(arg[arg.size()]);
-                auto source = sender(arg);
-                auto p = parse_cell_span();
-                auto b = source.begin();
-                while(columns)
-                {
-                    p.send(*b);
-                    ++b;
-                    if (auto res = p(); res.has_value())
-                    {
-                        if (--res->e < range_end)
-                        {
-                            assert(res->e < range_end);
-                            hfcs_cb(res.value());
-                            --columns;
-                        } else
-                        {
-                            hfcs_cb(res.value());
-                            --columns;
-                        }
-                    }
-                }
-                new_row_callback_();
-                while (b != source.end())
-                {
-                    p.send(*b);
-                    ++b;
-                    if (auto res = p(); res.has_value())
-                    {
-                    }
-                }
-            },src);
-
-        }
+//        void run_lazy(header_field_cell_span_cb_t hfcb, value_field_cell_span_cb_t fcb, new_row_callback_type nrc=[]{})
+//        {
+//            hfcs_cb = std::move(hfcb);
+//            vfcs_cb = std::move(fcb);
+//            new_row_callback_ = std::move(nrc);
+//            std::visit([&](auto&& arg)
+//            {
+//                auto columns = cols();
+//                auto range_end = std::addressof(arg[arg.size()]);
+//                auto source = sender(arg);
+//                auto p = parse_cell_span();
+//                auto b = source.begin();
+//                while(columns)
+//                {
+//                    p.send(*b);
+//                    ++b;
+//                    if (auto res = p(); res.has_value())
+//                    {
+//                        if (--res->e < range_end)
+//                        {
+//                            hfcs_cb(res.value());
+//                            --columns;
+//                        } else
+//                        {
+//                            hfcs_cb(res.value());
+//                            --columns;
+//                        }
+//                    }
+//                }
+//                new_row_callback_();
+//                while (b != source.end())
+//                {
+//                    p.send(*b);
+//                    ++b;
+//                    if (auto res = p(); res.has_value())
+//                    {
+//                    }
+//                }
+//            },src);
+//
+//        }
 
         struct exception : public std::runtime_error
         {
