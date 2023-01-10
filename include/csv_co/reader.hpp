@@ -374,6 +374,8 @@ namespace csv_co {
 
             friend FSM_cell_span reader::parse_cell_span() const noexcept;
             friend void reader::run_lazy(value_field_cell_span_cb_t, new_row_callback_type) const noexcept;
+            friend void reader::run_lazy(header_field_cell_span_cb_t, value_field_cell_span_cb_t,
+                                         new_row_callback_type) const noexcept;
 
             cell_span (cell_span const &) = default;
             cell_span& operator= (cell_span const &) = default;
@@ -622,7 +624,7 @@ namespace csv_co {
         // defaulted or user-defined by run(), or UB if user-defined nullptr
         mutable new_row_callback_type new_row_callback_;
 
-        header_field_cell_span_cb_t hfcs_cb;
+        mutable header_field_cell_span_cb_t hfcs_cb;
         mutable value_field_cell_span_cb_t  vfcs_cb;
 
     public:
@@ -762,26 +764,27 @@ namespace csv_co {
         {
             vfcs_cb = std::move(fcb);
             new_row_callback_ = std::move(nrc);
-            std::visit([&](auto&& arg) noexcept
+
+            std::visit([this](auto&& arg) noexcept
             {
-                auto range_end = std::addressof(arg[arg.size()]);
+                auto const range_end = std::addressof(arg[arg.size()]);
                 auto source = sender(arg);
                 auto p = parse_cell_span();
-                for (const auto & b: source)
+                for (const auto b: source)
                 {
                     p.send(b);
                     if (auto res = p(); res())
                     {
-                        if (--res.e < range_end)
+                        --res.e;
+                        vfcs_cb(res);
+                        if (res.e != range_end)
                         {
-                            vfcs_cb(res);
-                            if (*(res.e) == LF)
+                            if (*res.e == LF)
                             {
                                 new_row_callback_();
                             }
                         } else // ultimate LF
                         {
-                            vfcs_cb(res);
                             new_row_callback_();
                         }
                     }
@@ -829,47 +832,53 @@ namespace csv_co {
             }, src);
         }
 
-//        void run_lazy(header_field_cell_span_cb_t hfcb, value_field_cell_span_cb_t fcb, new_row_callback_type nrc=[]{})
-//        {
-//            hfcs_cb = std::move(hfcb);
-//            vfcs_cb = std::move(fcb);
-//            new_row_callback_ = std::move(nrc);
-//            std::visit([&](auto&& arg)
-//            {
-//                auto columns = cols();
-//                auto range_end = std::addressof(arg[arg.size()]);
-//                auto source = sender(arg);
-//                auto p = parse_cell_span();
-//                auto b = source.begin();
-//                while(columns)
-//                {
-//                    p.send(*b);
-//                    ++b;
-//                    if (auto res = p(); res.has_value())
-//                    {
-//                        if (--res->e < range_end)
-//                        {
-//                            hfcs_cb(res.value());
-//                            --columns;
-//                        } else
-//                        {
-//                            hfcs_cb(res.value());
-//                            --columns;
-//                        }
-//                    }
-//                }
-//                new_row_callback_();
-//                while (b != source.end())
-//                {
-//                    p.send(*b);
-//                    ++b;
-//                    if (auto res = p(); res.has_value())
-//                    {
-//                    }
-//                }
-//            },src);
-//
-//        }
+        void run_lazy(header_field_cell_span_cb_t hfcb, value_field_cell_span_cb_t fcb, new_row_callback_type nrc=[]{}) const noexcept
+        {
+            hfcs_cb = std::move(hfcb);
+            vfcs_cb = std::move(fcb);
+            new_row_callback_ = std::move(nrc);
+            std::visit([&](auto&& arg)
+            {
+                auto columns = cols();
+                auto range_end = std::addressof(arg[arg.size()]);
+                auto source = sender(arg);
+                auto p = parse_cell_span();
+                auto b = source.begin();
+                while(columns)
+                {
+                    p.send(*b);
+                    ++b;
+                    if (auto res = p(); res())
+                    {
+                        --res.e;
+                        hfcs_cb(res);
+                        --columns;
+                    }
+                }
+                new_row_callback_();
+                while (b != source.end())
+                {
+                    p.send(*b);
+                    ++b;
+                    if (auto res = p(); res())
+                    {
+                        if (--res.e < range_end)
+                        {
+                            vfcs_cb(res);
+                            if(*(res.e) == LF)
+                            {
+                                new_row_callback_();
+                            }
+                        } else
+                        {
+                            vfcs_cb(res);
+                            new_row_callback_();
+                        }
+                    }
+                }
+            },src);
+
+        }
 
         struct exception : public std::runtime_error
         {

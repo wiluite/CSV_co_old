@@ -1,8 +1,8 @@
 ## C++20 CSV data reader
 
-CSV_co is a C++20 coroutine-driven, one-pass and callback-providing CSV data processor, reader or parser. 
+CSV_co is a C++20 coroutine-driven, callback-providing and safe CSV data processor, reader or parser. 
 Hope, the tool is to a large extent in line with standard RFC 4180, because it was conceived and has been 
-designed to handle field selection transparently. The following requirements seem satisfied:
+developed to handle complicated field selection transparently. The following requirements seem satisfied:
 
 - MS-DOS (and Unix) style line endings.
 - Optional header line.
@@ -19,7 +19,7 @@ Pre 1.0.0
 
 ### Features
 - Memory-mapping of CSV files.
-- Both energetic and lazy modes of bypass.
+- Both "energetic" and "lazy" modes of bypass.
 - Callbacks for each field/cell (header's or value).
 - Callbacks for new rows.
 - String data types only, apply lexical cast transformations yourself.
@@ -48,7 +48,7 @@ To Andreas Fertig for coroutine tutorials and code that was highly borrowed.
     A. Read benchmarks chapter, please.
 
 ### Example
-Energetic mode, iterate over all fields, general scheme:
+"Energetic" mode, iterate over all fields, general scheme:
 ```cpp
     #include <csv_co/reader.hpp>
 
@@ -61,7 +61,7 @@ Energetic mode, iterate over all fields, general scheme:
     });
 ```
 
-Energetic mode, save all fields to a container and view a data:
+"Energetic" mode, save all fields to a container and view a data:
 ```cpp
   try {
         reader_type r(std::filesystem::path("smallpop.csv"));
@@ -84,7 +84,7 @@ Energetic mode, save all fields to a container and view a data:
     }
 ```
 
-Energetic mode, use 'new row' callback to facilitate filling a matrix:
+"Energetic" mode, use 'new row' callback to facilitate filling a matrix:
 ```cpp
     try {
         reader<trim_policy::alltrim> r (std::filesystem::path ("smallpop.csv"));
@@ -102,6 +102,12 @@ Energetic mode, use 'new row' callback to facilitate filling a matrix:
         std::cout << matrix[0][0] << ',' << matrix[0][1] << ':' << matrix[0][3] << '\n';
     } catch (reader_type::exception const & e) {/* handler */}
 ```
+However, in this mode parser works hard to select, prepare and provide every field. This is
+somewhat more time-consuming, especially if you are interested in some specific fields and 
+in common would prefer to move forward more quickly. There is a lazier option for field 
+traversal, where the parser keeps for you the memory span corresponding to the current field
+and gives you the opportunity to get the value of this field in the container you provide.
+
 
 ### Problems
 
