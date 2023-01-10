@@ -10,7 +10,7 @@ set(CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
 
 option (WITH_SANITY_CHECK "Build all with Clang sanitizers" OFF)
-option (CLANG_STDLIB_LIBCPP "Build all with Clang STL" ON)
+option (CLANG_STDLIB_LIBCPP "Build all with Clang STL" OFF)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)

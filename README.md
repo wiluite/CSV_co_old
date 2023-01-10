@@ -1,10 +1,11 @@
 ## C++20 CSV data reader
 
 CSV_co is a C++20 coroutine-driven, callback-providing and safe CSV data processor, reader or parser. 
-Hope, the tool is to a large extent in line with standard RFC 4180, because it was conceived and has been 
-developed to handle complicated field selection transparently. The following requirements seem satisfied:
+Hope, the tool is to a large extent in line with standard RFC 4180, because it was conceived and has 
+been developed to handle complicated field selection carefully and clearly. The following requirements 
+tend to be satisfied:
 
-- MS-DOS (and Unix) style line endings.
+- Windows and Unix style line endings.
 - Optional header line.
 - Each row (record) must contain the same number of fields.
 - A field can be enclosed in double quotes.
@@ -12,7 +13,7 @@ developed to handle complicated field selection transparently. The following req
 - The double quote character in the field must be doubled.
 
 In fact, coroutines and callbacks do not contradict each other, but complement each other if they perform 
-different tasks in one, and when only few callbacks intended for the end-user are.
+different tasks in the whole, and when only few callbacks intended for the end-user are.
 
 ### Version
 Pre 1.0.0
