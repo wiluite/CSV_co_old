@@ -270,9 +270,7 @@ namespace csv_co {
                         std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<cell_span>> )
                         mCoroHdl.promise().mValue = std::nullopt;
                     else
-                    if constexpr (std::is_same_v<decltype(mCoroHdl.promise().mValue), cell_span> )
-                        mCoroHdl.promise().mValue = cell_span{};
-                    else mCoroHdl.promise().mValue.clear();
+                        mCoroHdl.promise().mValue.clear();
                 return tmp;
             }
 
@@ -350,11 +348,20 @@ namespace csv_co {
         class cell_span
         {
         private:
-            typename cell_string::const_pointer b;
-            typename cell_string::const_pointer e;
+            typename cell_string::const_pointer b = nullptr;
+            typename cell_string::const_pointer e = nullptr;
+
+            inline bool operator()() const noexcept { return (b != nullptr); }
+            inline void clear () {b = nullptr;}
+
+            friend FSM_cell_span reader::parse_cell_span() const noexcept;
+            friend void reader::run_lazy(value_field_cell_span_cb_t, new_row_callback_type) const noexcept;
+            friend void reader::run_lazy(header_field_cell_span_cb_t, value_field_cell_span_cb_t, new_row_callback_type) const noexcept;
+            template<typename T, typename U>
+            friend struct async_generator;
+
         public:
-            cell_span() : b(nullptr), e(nullptr) {}
-            cell_span (auto b, auto e) : b(b), e(e) {}
+            cell_span() noexcept = default;
             void read_value(cell_string & s) const
             {
                 assert(b!=nullptr && e!=nullptr);
@@ -370,12 +377,6 @@ namespace csv_co {
                 unique_quote(s, Quote::value);
                 TrimPolicy::trim(s);
             }
-            inline bool operator()() const noexcept { return (b != nullptr); }
-
-            friend FSM_cell_span reader::parse_cell_span() const noexcept;
-            friend void reader::run_lazy(value_field_cell_span_cb_t, new_row_callback_type) const noexcept;
-            friend void reader::run_lazy(header_field_cell_span_cb_t, value_field_cell_span_cb_t,
-                                         new_row_callback_type) const noexcept;
 
             cell_span (cell_span const &) = default;
             cell_span& operator= (cell_span const &) = default;
@@ -459,17 +460,17 @@ namespace csv_co {
                 field.push_back(b);
             }
         }
-        
+
         FSM_cell_span parse_cell_span() const noexcept
         {
             cell_span noopt_span;
 
             std::visit([&](auto&& arg)
             {
-                noopt_span = {std::addressof(arg[0]), std::addressof(arg[0])};
+                noopt_span.b = noopt_span.e = std::addressof(arg[0]);
             },src );
 
-            do
+            for(;;)
             {
                 auto b = co_await char{};
                 ++noopt_span.e;
@@ -486,24 +487,16 @@ namespace csv_co {
                     {
                         b = co_await char{};
                         ++noopt_span.e;
-                        if (!limiter(b))
+                        if (limiter(b) && !(quote_counter & 1))
                         {
-                            if (Quote::value == b)
-                                ++quote_counter;
-                            continue;
+                            co_yield noopt_span;
+                            noopt_span.b = noopt_span.e;
+                            break;
                         }
-                        if (quote_counter & 1)
-                        {
-                            continue;
-                        }
-
-                        co_yield noopt_span;
-                        noopt_span.b = noopt_span.e;
-                        break;
+                        quote_counter += (Quote::value == b) ? 1 : 0;
                     }
-                    continue;
                 }
-            } while(true);
+            }
         }
 
         FSM_cols parse_cols() const
@@ -731,7 +724,10 @@ namespace csv_co {
                         }
                     }
                 }
-                if (!result) throw exception ("We are facing Move-from state.");
+                if (!result)
+                {
+                    throw exception ("We are facing Move-from state.");
+                }
             }, src);
 
             return *this;
@@ -770,21 +766,22 @@ namespace csv_co {
                 auto const range_end = std::addressof(arg[arg.size()]);
                 auto source = sender(arg);
                 auto p = parse_cell_span();
-                for (const auto b: source)
+                for (auto const & b: source)
                 {
                     p.send(b);
-                    if (auto res = p(); res())
+                    if (const auto & r = p(); r())
                     {
-                        --res.e;
-                        vfcs_cb(res);
-                        if (res.e != range_end)
+                        auto res = r;
+                        if (--res.e != range_end)
                         {
+                            vfcs_cb(res);
                             if (*res.e == LF)
                             {
                                 new_row_callback_();
                             }
                         } else // ultimate LF
                         {
+                            vfcs_cb(res);
                             new_row_callback_();
                         }
                     }
@@ -860,8 +857,9 @@ namespace csv_co {
                 {
                     p.send(*b);
                     ++b;
-                    if (auto res = p(); res())
+                    if (const auto &r = p(); r())
                     {
+                        auto res = r;
                         if (--res.e < range_end)
                         {
                             vfcs_cb(res);
@@ -877,7 +875,6 @@ namespace csv_co {
                     }
                 }
             },src);
-
         }
 
         struct exception : public std::runtime_error

@@ -1,30 +1,46 @@
-## C++20 CSV data reader
+<p align="center">
+  <img height="100" src="img/csv_co.png" alt="csv_co"/>
+</p>
 
-CSV_co is a C++20 coroutine-driven, callback-providing and safe CSV data processor, reader or parser. 
-Hope, the tool is to a large extent in line with standard RFC 4180, because it was conceived and has 
-been developed to handle complicated field selection carefully and clearly. The following requirements 
+## C++20 CSV data reader
+*    [About](#bout)
+*    [Version](#version)
+*    [Features](#features)
+*    [Minimum Supported Compilers](#minimum-supported-compilers)
+*    [Acknowledgments](#acknowledgments)
+*    [FAQ](#faq)
+*    [Example](#example)
+*    [Problems](#problems)
+*    [Benchmarks](#benchmarks)
+
+### About
+CSV_co is a C++20 coroutine-driven, callback-providing and safe CSV data reader (or parser). 
+Hope, tool is to a large extent in line with standard RFC 4180, because it was conceived and has 
+been developed to handle field selection carefully and clearly. The following requirements 
 tend to be satisfied:
 
 - Windows and Unix style line endings.
 - Optional header line.
 - Each row (record) must contain the same number of fields.
-- A field can be enclosed in double quotes.
-- If a field contains commas, line breaks, double quotes, then this field must be enclosed in double quotes.
+- A field **can** be enclosed in double quotes.
+- If a field contains commas, line breaks, double quotes, then this field **must** be enclosed in
+double quotes.
 - The double quote character in the field must be doubled.
 
-In fact, coroutines and callbacks do not contradict each other, but complement each other if they perform 
-different tasks in the whole, and when only few callbacks intended for the end-user are.
+Well, coroutines and callbacks do not contradict each other, but complement each other if they perform 
+different tasks in the whole, and when there are only few callbacks intended for the end-user.
 
 ### Version
 Pre 1.0.0
 
 ### Features
-- Memory-mapping of CSV files.
-- Both "energetic" and "lazy" modes of bypass.
+- Memory-mapping CSV files.
+- Two modes of iteration.
 - Callbacks for each field/cell (header's or value).
 - Callbacks for new rows.
-- String data types only, apply lexical cast transformations yourself.
+- String data type only, apply type casts on your own.
 - Strong typed (concept-based) reader template parameters.
+- Well tested
 
 ### Minimum Supported Compilers
 - Linux
@@ -39,14 +55,17 @@ Pre 1.0.0
 To Andreas Fertig for coroutine tutorials and code that was highly borrowed.
 
 ### FAQ
-    Q. Why another parser?
-    A. Because I don't think some authors work correctly with quoted fields.
+> Why another parser?  
 
-    Q. Why are you unquoting quoted fields?
-    A. Because quotes are for data processors, not the end-user. String itself is quoted.
+Because I am very unsure about some authors' workings on complicated CSV fields.  
 
-    Q. How fast is it?
-    A. Read benchmarks chapter, please.
+> Why are you unquoting quoted fields?
+
+Because quotes are for data processors, not the end-user. String's nature is quote.
+
+> How fast is it?
+
+Well, it is not the fastest. But, look at benchmarks.
 
 ### Example
 "Energetic" mode, iterate over all fields, general scheme:
@@ -105,12 +124,34 @@ To Andreas Fertig for coroutine tutorials and code that was highly borrowed.
 ```
 However, in this mode parser works hard to select, prepare and provide every field. This is
 somewhat more time-consuming, especially if you are interested in some specific fields and 
-in common would prefer to move forward more quickly. There is a lazier option for field 
-traversal, where the parser keeps for you the memory span corresponding to the current field
+in common would prefer to move forward a bit faster. There is a lazier option for field 
+traversal, where the parser is keeping the memory span corresponding to the current field
 and gives you the opportunity to get the value of this field in the container you provide.
 
-
 ### Problems
+Byte nature of parsing coroutine protocol, frequent coroutine switching.
+Well, another approach would, for sure, bring clarity at the expense of speed. 
 
 ### Benchmarks
+Benchmarking example is in benchmark folder. It measures the average execution time 
+(after a warmup run) for `CSV_co` to memory-map the input CSV file and iterate over every 
+field in it.
+```bash
+cd benchmark
+clang++ -I../include -O3 -std=c++20 -stdlib=libc++ ./lazybench.cpp
+cd ..
+```
+#### System Details
+
+| Type          | Value                                           |
+|---------------|-------------------------------------------------|
+| Processor     | Intel(R) Core(TM) i7-6700 CPU @ 3.40 GHz        |
+| Installed RAM | 16 GB                                           |
+| HDD/SSD       | USB hard drive                                  |
+| OS            | Linux slax 5.10.92 (Debian Linux 11 (bullseye)) |
+| C++ Compiler  | Clang 15.0.6                                    |
+
+
+#### Results
+
 

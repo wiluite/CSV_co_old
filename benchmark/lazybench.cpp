@@ -9,7 +9,7 @@ int main(int argc, char ** argv)
 {
     if (argc != 2)
     {
-        std::cout << "Usage: ./lazy <csv_file>\n";
+        std::cout << "Usage: ./lazybench <csv_file>\n";
         return EXIT_FAILURE;
     }
 
@@ -27,7 +27,7 @@ int main(int argc, char ** argv)
         {
             auto const begin = std::chrono::high_resolution_clock::now();
             cells = rows = 0;
-            reader r ((std::filesystem::path (argv[1])));
+            reader r (std::filesystem::path {argv[1]});
             r.run_lazy([&cells](auto & s){ ++cells; }, [&rows]{ ++rows; });
             auto const end = std::chrono::high_resolution_clock::now();
             accum_times += std::chrono::duration_cast<std::chrono::milliseconds>(end-begin).count();
