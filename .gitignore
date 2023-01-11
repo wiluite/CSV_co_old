@@ -36,3 +36,4 @@ cmake-build*
 build*
 *.acer
 *.ini
+img

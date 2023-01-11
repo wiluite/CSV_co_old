@@ -55,7 +55,7 @@ To Andreas Fertig for coroutine tutorials and code that was highly borrowed.
 
     using namespace csv_co;
     using reader_type = reader< trimming_policy >;
-    
+
     reader_type r( CSV_source );
     r.run([](auto & s) {
         // do something with field string
@@ -90,14 +90,14 @@ To Andreas Fertig for coroutine tutorials and code that was highly borrowed.
     try {
         reader<trim_policy::alltrim> r (std::filesystem::path ("smallpop.csv"));
         some_matrix_class matrix (shape);
-        
+
         auto c_row {-1}; // will be incremented automatically
         auto c_col {0u};
 
         // ignore header fields, obtain value fields, and trace rows:
-        r.run([](auto) {}                                   
+        r.run([](auto) {}
               ,[&](auto & s){ matrix[c_row][c_col++] = s; } 
-              ,[&]{ c_row++; c_col = 0; });                 
+              ,[&]{ c_row++; c_col = 0; });
 
         // population of Southborough,MA
         std::cout << matrix[0][0] << ',' << matrix[0][1] << ':' << matrix[0][3] << '\n';
