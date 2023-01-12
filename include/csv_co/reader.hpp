@@ -238,7 +238,7 @@ namespace csv_co {
 
                 T await_resume()
                 {
-                    //assert(mRecentSignal.has_value());
+                    assert(mRecentSignal.has_value());
                     auto tmp = *mRecentSignal;
                     mRecentSignal.reset();
                     return tmp;
@@ -262,8 +262,7 @@ namespace csv_co {
                 auto tmp{std::move(mCoroHdl.promise().mValue)};
                     if constexpr (
                         std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<std::size_t>> ||
-                        std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<bool>> ||
-                        std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<cell_span>> )
+                        std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<bool>> )
                         mCoroHdl.promise().mValue = std::nullopt;
                     else
                         mCoroHdl.promise().mValue.clear();
@@ -381,7 +380,7 @@ namespace csv_co {
         static constexpr char LF{'\n'};
         static constexpr char special{'\0'};
 
-        [[nodiscard]] inline bool limiter(char b) const
+        [[nodiscard]] inline bool limiter(char b) const noexcept
         {
             return (Delimiter::value == b) || (LF == b);
         }
@@ -478,7 +477,7 @@ namespace csv_co {
             }
         }
 
-        FSM_cols parse_cols() const
+        FSM_cols parse_cols() const noexcept
         {
             std::optional<std::size_t> cols = 0;
             for(;;)
@@ -496,28 +495,22 @@ namespace csv_co {
                 }
                 if (Quote::value == b)
                 {
-                    std::size_t quote_counter = 1;
+                    unsigned quote_counter = 1;
                     for(;;)
                     {
                         b = co_await char{};
-                        if (!limiter(b))
+                        if (limiter(b) && !(quote_counter & 1))
                         {
-                            quote_counter += (Quote::value == b) ? 1 : 0;
-                            continue;
+                            cols = cols.value() + 1;
+                            if (LF == b)
+                            {
+                                co_yield cols;
+                                cols = 0;
+                                break;
+                            }
                         }
-                        if (quote_counter % 2)
-                        {
-                            continue;
-                        }
-                        cols = cols.value() + 1;
-                        if (LF == b)
-                        {
-                            co_yield cols;
-                            cols = 0;
-                        }
-                        break;
+                        quote_counter += (Quote::value == b) ? 1 : 0;
                     }
-                    continue;
                 }
             }
         }
@@ -705,7 +698,7 @@ namespace csv_co {
                 }
                 if (!result)
                 {
-                    throw exception ("We are facing Move-from state.");
+                    throw exception ("Use of Move-From state object");
                 }
             }, src);
 
