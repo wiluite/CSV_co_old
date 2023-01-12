@@ -515,45 +515,30 @@ namespace csv_co {
             }
         }
 
-        FSM_rows parse_rows() const
-        {
-            std::optional<bool> line_end = std::nullopt;
-            for(;;)
-            {
+        FSM_rows parse_rows() const noexcept {
+            std::optional<bool> line_end;
+            for (;;) {
                 auto b = co_await char{};
-                if (limiter(b))
-                {
-                    if (LF == b)
-                    {
+                if (limiter(b)) {
+                    if (LF == b) {
                         line_end = true;
                         co_yield line_end;
                     }
                     continue;
                 }
-                if (Quote::value == b)
-                {
-                    std::size_t quote_counter = 1;
-                    for(;;)
-                    {
+                if (Quote::value == b) {
+                    unsigned quote_counter = 1;
+                    for (;;) {
                         b = co_await char{};
-                        if (!limiter(b))
-                        {
-                            quote_counter += (Quote::value == b) ? 1 : 0;
-                            continue;
+                        if (limiter(b) && !(quote_counter & 1)) {
+                            if (LF == b) {
+                                line_end = true;
+                                co_yield line_end;
+                            }
+                            break;
                         }
-                        if (quote_counter % 2)
-                        {
-                            continue;
-                        }
-
-                        if (LF == b)
-                        {
-                            line_end = true;
-                            co_yield line_end;
-                        }
-                        break;
+                        quote_counter += (Quote::value == b) ? 1 : 0;
                     }
-                    continue;
                 }
             }
         }

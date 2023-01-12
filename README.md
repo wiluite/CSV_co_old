@@ -16,8 +16,8 @@
 ### About
 CSV_co is a C++20 coroutine-driven, callback-providing and safe CSV data reader, or parser. 
 Hope, it is to a large extent in line with standard RFC 4180, because it was conceived and 
-has been developed to handle field selection carefully. The following requirements tend to
-be satisfied:
+has been developed to handle with field selection carefully. The following requirements tend
+to be satisfied:
 
 - Windows and Unix style line endings.
 - Optional header line.
@@ -34,11 +34,12 @@ Because I am very unsure about some authors' workings on complicated CSV fields.
 
 > Why are you unquoting quoted fields?
 
-Because quotes are for *data processors*, not the end-user. String's nature is quote.
+Because quotes are for *data processors*, not the end-users: quotes (double quotes) is
+string's nature.
 
 > How fast is it?
 
-Well, it is not the fastest. But look at [benchmarks](#benchmarks). Remember, iteration speed
+Well, it is not the fastest. But look at [Benchmarks](#benchmarks). Remember, iteration speed
 dissolves in data processing times.
 
 ### Features
@@ -100,10 +101,10 @@ General scheme:
     }
 ```
 
-"Energetic" mode, use 'new row' callback to facilitate filling a matrix:
+"Energetic" mode, use `new row` callback to facilitate filling a matrix:
 ```cpp
     try {
-        reader<trim_policy::alltrim> r (std::filesystem::path ("smallpop.csv"));
+        reader<trim_policy::alltrim> r (std::filesystem::path("smallpop.csv"));
         some_matrix_class matrix (shape);
 
         auto c_row {-1}; // will be incremented automatically
