@@ -107,9 +107,8 @@ namespace csv_co {
     namespace string_functions
     {
 
-        bool
         inline
-        devastated(auto const & s)
+        bool devastated(auto const & s)
         {
             return (s.find_first_not_of(" \n\r\t") == std::string::npos);
         }
@@ -122,9 +121,8 @@ namespace csv_co {
             return {(d != std::string::npos && s[d] == ch), d};
         }
 
-        bool
         inline
-        del_last (auto & source, char ch='"')
+        bool del_last (auto & source, char ch='"')
         {
             auto const pos = source.find_last_of(ch);
             assert (pos != std::string::npos);
@@ -132,9 +130,8 @@ namespace csv_co {
             return devastated(std::decay_t<decltype(source)>{sv.begin(), sv.end()}) && (source.erase(pos, 1), true);
         }
 
-        void
         inline
-        unquote(cell_string &s, char ch)
+        void unquote(cell_string &s, char ch)
         {
             auto const [ret,pos] = begins_with(s, ch);
             if (ret && del_last(s, ch))
@@ -143,9 +140,8 @@ namespace csv_co {
             }
         }
 
-        void
         inline
-        unique_quote (auto & s, char q)
+        void unique_quote (auto & s, char q)
         {
             auto const last = unique(s.begin(), s.end(), [q](auto const& first, auto const& second)
             {
@@ -406,6 +402,7 @@ namespace csv_co {
                 auto b = co_await char{};
                 if (limiter(b))
                 {
+                    co_yield_label:
                     TrimPolicy::trim(field);
                     dirty_trick(field);
                     if (LF == b)
@@ -418,44 +415,26 @@ namespace csv_co {
                 }
                 if (Quote::value == b)
                 {
-                    using namespace string_functions;
-
-                    bool was_devastated = devastated(field);
+                    bool was_devastated = string_functions::devastated(field);
                     if (!was_devastated)
                     {
                         field.push_back(b);
                     }
-                    std::size_t quote_counter = 1;
+                    unsigned quote_counter = 1;
                     for(;;)
                     {
                         b = co_await char{};
-                        if (!limiter(b))
+                        if (limiter(b) && !(quote_counter & 1))
                         {
-                            field.push_back(b);
-                            quote_counter += (Quote::value == b) ? 1 : 0;
-                            continue;
+                            if (was_devastated)
+                                string_functions::del_last(field, Quote::value);
+
+                            string_functions::unique_quote(field, Quote::value);
+                            goto co_yield_label; // What? Yes, it IS!
                         }
-                        if (quote_counter % 2)
-                        {
-                            field.push_back(b);
-                            continue;
-                        }
-                        if (was_devastated)
-                        {
-                            del_last(field, Quote::value);
-                        }
-                        unique_quote(field, Quote::value);
-                        TrimPolicy::trim(field);
-                        dirty_trick(field);
-                        if (LF == b)
-                        {
-                            field.push_back(LF);
-                        }
-                        co_yield field;
-                        field.clear();
-                        break;
+                        quote_counter += (Quote::value == b) ? 1 : 0;
+                        field.push_back(b);
                     }
-                    continue;
                 }
                 field.push_back(b);
             }

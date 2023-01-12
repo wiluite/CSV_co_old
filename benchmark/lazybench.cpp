@@ -13,7 +13,7 @@ int main(int argc, char ** argv)
         return EXIT_FAILURE;
     }
 
-    std::size_t num_exp = 10;
+    std::size_t num_exp = 5;
     std::size_t accum_times = 0;
 
     try

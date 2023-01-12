@@ -537,7 +537,6 @@ int main() {
 
     };
 
-
     "Reader LAZY header and value callbacks process hard quoted fields"_test = []
     {
         {
