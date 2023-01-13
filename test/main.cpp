@@ -19,7 +19,7 @@ int main() {
         expect(devastated(s));
 
         s = R"(""Christmas Tree"" is bad food)";
-        unique_quote(s, quote::value);
+        unique_quote(s, double_quotes::value);
         expect(s == R"("Christmas Tree" is bad food)");
         auto [a, b] = begins_with(s, '"');
         expect(a);
@@ -187,7 +187,7 @@ int main() {
 
         using new_delimiter = delimiter<';'>;
 
-        reader<trim_policy::no_trimming, quote, new_delimiter> r("one;two;three\nfour;five;six");
+        reader<trim_policy::no_trimming, double_quotes, new_delimiter> r("one;two;three\nfour;five;six");
         r.run([&](auto &s) {
             v.push_back(s);
         });

@@ -85,7 +85,7 @@ namespace csv_co {
     template <char ch> struct quote_char {
         constexpr static char value = ch;
     };
-    using quote = quote_char<'"'>;
+    using double_quotes = quote_char<'"'>;
     template <class T>
     concept QuoteConcept = requires (T t)
     {
@@ -153,7 +153,7 @@ namespace csv_co {
     }
 
     template <TrimPolicyConcept TrimPolicy = trim_policy::no_trimming
-            , QuoteConcept Quote = quote, DelimiterConcept Delimiter = comma_delimiter>
+            , QuoteConcept Quote = double_quotes, DelimiterConcept Delimiter = comma_delimiter>
     class reader
     {
 
@@ -324,6 +324,7 @@ namespace csv_co {
             PromiseTypeHandle mCoroHdl;
         };
 
+        // parsing State Machines:
         using FSM = async_generator<cell_string, char>;
         using FSM_cols = async_generator<std::optional<std::size_t>, char>;
         using FSM_rows = async_generator<std::optional<bool>, char>;
@@ -332,13 +333,14 @@ namespace csv_co {
 
         using FSM_cell_span = async_generator<cell_span, char>;
 
-        using header_field_cb_t = std::function <void (cell_string const & frame)>;
-        using value_field_cb_t = std::function <void (cell_string const & frame)>;
+        // callback types:
+        using header_field_cb_t = std::function <void (cell_string const & value)>;
+        using value_field_cb_t = std::function <void (cell_string const & value)>;
 
-        using header_field_cell_span_cb_t = std::function <void (cell_span const & frame)>;
-        using value_field_cell_span_cb_t = std::function <void (cell_span const & frame)>;
+        using header_field_span_cb_t = std::function <void (cell_span const & span)>;
+        using value_field_span_cb_t = std::function <void (cell_span const & span)>;
 
-        using new_row_callback_type = std::function <void ()>;
+        using new_row_cb_t = std::function <void ()>;
 
         class cell_span
         {
@@ -350,13 +352,12 @@ namespace csv_co {
             inline void clear () {b = nullptr;}
 
             friend FSM_cell_span reader::parse_cell_span() const noexcept;
-            friend void reader::run_lazy(value_field_cell_span_cb_t, new_row_callback_type) const noexcept;
-            friend void reader::run_lazy(header_field_cell_span_cb_t, value_field_cell_span_cb_t, new_row_callback_type) const noexcept;
+            friend void reader::run_lazy(value_field_span_cb_t, new_row_cb_t) const;
+            friend void reader::run_lazy(header_field_span_cb_t, value_field_span_cb_t, new_row_cb_t) const;
             template<typename T, typename U>
             friend struct async_generator;
 
         public:
-            cell_span() noexcept = default;
             void read_value(cell_string & s) const
             {
                 assert(b!=nullptr && e!=nullptr);
@@ -372,9 +373,6 @@ namespace csv_co {
                 unique_quote(s, Quote::value);
                 TrimPolicy::trim(s);
             }
-
-            cell_span (cell_span const &) = default;
-            cell_span& operator= (cell_span const &) = default;
         };
 
         static constexpr char LF{'\n'};
@@ -516,7 +514,8 @@ namespace csv_co {
             }
         }
 
-        FSM_rows parse_rows() const noexcept {
+        FSM_rows parse_rows() const noexcept
+        {
             std::optional<bool> line_end;
             for (;;)
             {
@@ -576,14 +575,14 @@ namespace csv_co {
         std::variant<mio::ro_mmap, cell_string> src;
 
         // nullptr by default, or used-default by run(). UB if nullptr
-        header_field_cb_t hf_cb;
+        mutable header_field_cb_t hf_cb;
         // always user-defined: by run() or UB if user-defined nullptr
-        value_field_cb_t  vf_cb;
+        mutable value_field_cb_t  vf_cb;
         // defaulted or user-defined by run(), or UB if user-defined nullptr
-        mutable new_row_callback_type new_row_callback_;
+        mutable new_row_cb_t new_row_callback_;
 
-        mutable header_field_cell_span_cb_t hfcs_cb;
-        mutable value_field_cell_span_cb_t  vfcs_cb;
+        mutable header_field_span_cb_t hfcs_cb;
+        mutable value_field_span_cb_t  vfcs_cb;
 
     public:
         using trim_policy_type = TrimPolicy;
@@ -591,19 +590,19 @@ namespace csv_co {
         using delimiter_type = Delimiter;
 
         // TODO: stop calling for rvalue string...
-        explicit reader(std::filesystem::path const & fp) : src {mio::ro_mmap {}}
+        explicit reader(std::filesystem::path const & csv_src) : src {mio::ro_mmap {}}
         {
             std::error_code mmap_error;
-            std::get<0>(src).map(fp.string().c_str(), mmap_error);
+            std::get<0>(src).map(csv_src.string().c_str(), mmap_error);
             if (mmap_error)
             {
-                throw exception (mmap_error.message(), " : ", fp.string());
+                throw exception (mmap_error.message(), " : ", csv_src.string());
             }
         }
 
         template <template<class> class Alloc=std::allocator>
-        explicit reader (std::basic_string<char, std::char_traits<char>, Alloc<char>> const & s)
-                : src {s}
+        explicit reader (std::basic_string<char, std::char_traits<char>, Alloc<char>> const & csv_src)
+                : src {csv_src}
         {
             if (std::get<1>(src).empty())
             {
@@ -612,15 +611,10 @@ namespace csv_co {
         }
 
         // let us express C-style string parameter constructor via usual string parameter constructor
-        explicit reader (const char * s) : reader(cell_string(s)) {}
-
-        reader (reader const & other) = delete;
-        reader & operator= (reader const & other) = delete;
+        explicit reader (const char * csv_src) : reader(cell_string(csv_src)) {}
 
         reader (reader && other) noexcept = default;
         reader & operator=(reader && other) noexcept = default;
-
-        ~reader() = default;
 
         [[nodiscard]] std::size_t cols() const noexcept
         {
@@ -698,7 +692,7 @@ namespace csv_co {
             return *this;
         }
 
-        void run(value_field_cb_t fcb, new_row_callback_type nrc=[]{})
+        void run(value_field_cb_t fcb, new_row_cb_t nrc=[]{}) const
         {
             vf_cb = std::move(fcb);
             new_row_callback_ = std::move(nrc);
@@ -721,7 +715,7 @@ namespace csv_co {
             }, src);
         }
 
-        void run_lazy(value_field_cell_span_cb_t fcb, new_row_callback_type nrc=[]{}) const noexcept
+        void run_lazy(value_field_span_cb_t fcb, new_row_cb_t nrc=[]{}) const
         {
             vfcs_cb = std::move(fcb);
             new_row_callback_ = std::move(nrc);
@@ -754,7 +748,7 @@ namespace csv_co {
             }, src);
         }
 
-        void run(header_field_cb_t hfcb, value_field_cb_t fcb, new_row_callback_type nrc=[]{})
+        void run(header_field_cb_t hfcb, value_field_cb_t fcb, new_row_cb_t nrc=[]{}) const
         {
             hf_cb = std::move(hfcb);
             vf_cb = std::move(fcb);
@@ -794,7 +788,7 @@ namespace csv_co {
             }, src);
         }
 
-        void run_lazy(header_field_cell_span_cb_t hfcb, value_field_cell_span_cb_t fcb, new_row_callback_type nrc=[]{}) const noexcept
+        void run_lazy(header_field_span_cb_t hfcb, value_field_span_cb_t fcb, new_row_cb_t nrc=[]{}) const
         {
             hfcs_cb = std::move(hfcb);
             vfcs_cb = std::move(fcb);
@@ -885,6 +879,9 @@ namespace csv_co {
     {
         std::terminate();
     }
+
+    static_assert(!std::is_copy_constructible<reader<>>::value);
+    static_assert(std::is_move_constructible<reader<>>::value);
 
 } // namespace
 

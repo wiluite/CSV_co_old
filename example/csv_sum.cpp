@@ -4,18 +4,21 @@
 #include <csv_co/reader.hpp>
 #include <iostream>
 
-using namespace csv_co;
-
 int main() {
 
+    using namespace csv_co;
+
     try {
-        reader r(std::filesystem::path("smallpop.csv"));
+       reader r(std::filesystem::path("smallpop.csv"));
+
+        constexpr unsigned population_col = 3;
         auto sum = 0u;
+
         r.valid().run_lazy(
                 [](auto) {}
-                , [&](auto & s) {
+                , [&sum](auto & s) {
                     static auto col {0u};
-                    if (col++ == 3) {
+                    if (col++ == population_col) {
                         col = 0;
                         cell_string value;
                         s.read_value(value);

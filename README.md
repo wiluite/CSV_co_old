@@ -25,7 +25,7 @@ to be satisfied:
 - A field **can** be enclosed in double quotes.
 - If a field contains commas, line breaks, double quotes, then this field **must** be enclosed in
 double quotes.
-- The double quote character in the field must be doubled.
+- The double double_quotes character in the field must be doubled.
 
 ### FAQ
 > Why another parser?
@@ -34,8 +34,7 @@ Because I am very unsure about some authors' workings on complicated CSV fields.
 
 > Why are you unquoting quoted fields?
 
-Because quotes are for *data processors*, not the end-users: quotes (double quotes) is
-string's nature.
+Because quotes are for *preprocessing*, not the end-users.
 
 > How fast is it?
 
@@ -138,10 +137,57 @@ lazier field iteration: the parser is keeping the memory span corresponding to t
 current field and gives you the opportunity to get the value of this field in the
 container you provide.
 
+### API
+Public API available:
+```cpp
+    using cell_string = std::basic_string<char, std::char_traits<char>, alloc<char>>;
+    
+    template <TrimPolicyConcept TrimPolicy = trim_policy::no_trimming
+            , QuoteConcept Quote = double_quotes, DelimiterConcept Delimiter = comma_delimiter>
+    class reader
+    {
+    public:
+        // Constructors
+        explicit reader(std::filesystem::path const & csv_src);
+        template <template<class> class Alloc=std::allocator>
+        explicit reader (std::basic_string<char, std::char_traits<char>, Alloc<char>> const & csv_src);
+        explicit reader (const char * csv_src);
+        // CSV_co is movable type
+        reader (reader && other) noexcept = default;
+        reader & operator=(reader && other) noexcept = default;
+        
+        // Shape
+        [[nodiscard]] std::size_t cols() const noexcept;
+        [[nodiscard]] std::size_t rows() const noexcept;
+        
+        // Validation
+        [[nodiscard]] reader& valid();
+        
+        // Parsing
+        void run(value_field_cb_t fcb, new_row_cb_t nrc=[]{}) const;
+        void run(header_field_cb_t hfcb, value_field_cb_t fcb, new_row_cb_t nrc=[]{}) const;
+        void run_lazy(value_field_span_cb_t fcb, new_row_cb_t nrc=[]{}) const;
+        void run_lazy(header_field_span_cb_t hfcb, value_field_span_cb_t fcb, new_row_cb_t nrc=[]{}) const;
+        
+        // Reading the field value in within callbacks
+        class cell_span
+        {   ///...
+        public:
+            void read_value(cell_string & s) const;
+        }; 
+    private:
+        // Callback types:
+        using header_field_cb_t = std::function <void (cell_string const & value)>;
+        using value_field_cb_t = std::function <void (cell_string const & value)>;
+        using header_field_span_cb_t = std::function <void (cell_span const & span)>;
+        using value_field_span_cb_t = std::function <void (cell_span const & span)>;
+        using new_row_cb_t = std::function <void ()>;
+    };
+```
 ### Problems
-Frequent coroutine switching due to current byte-parsing protocol. Well, another approach
-would for sure bring parsing clarity at the expense of speed. Believe, that could be
-easily implemented.
+Frequent coroutine switching due to current byte-parsing protocol which lead to
+time-consuming overheads. Well, another approach would bring parsing clarity at
+the expense of speed. That could be easily implemented sometime.
 
 ### Benchmarks
 Benchmarking source is in `benchmark` folder. It measures, in lazy iteration mode, the
@@ -170,4 +216,3 @@ cd ..
 | Benchmark folder's game.csv                                                        | 2.6M      | 100000  | 6    | 600'000     | 0.012s |
 | [Denver Crime Data](https://www.kaggle.com/paultimothymooney/denver-crime-data)    | 102M      | 399573  | 20   | 7'991'460   | 0.530s |
 | [2015 Flight Delays and Cancellations](https://www.kaggle.com/usdot/flight-delays) | 565M      | 5819080 | 31   | 180'391'480 | 3.7s   |
-
