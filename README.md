@@ -1,5 +1,5 @@
 <p align="center">
-  <img height="100" src="img/csv_co.png" alt="csv_co"/>
+  <img height="110" src="img/csv_co.png" alt="csv_co"/>
 </p>
 
 ## C++20 CSV data reader

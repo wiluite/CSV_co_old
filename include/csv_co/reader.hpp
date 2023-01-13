@@ -572,6 +572,21 @@ namespace csv_co {
             }
         }
 
+        template <typename Range>
+        generator<coroutine_stream_type> sender_span(Range const & r) const
+        {
+            for (auto e : r)
+            {
+                co_yield e;
+            }
+        }
+        template <typename Range>
+        generator<coroutine_stream_type> sender_span_LF(Range const & r) const
+        {
+            co_yield '\n';
+        }
+
+
         std::variant<mio::ro_mmap, cell_string> src;
 
         // nullptr by default, or used-default by run(). UB if nullptr
@@ -723,7 +738,7 @@ namespace csv_co {
             std::visit([this](auto&& arg) noexcept
             {
                 auto const range_end = std::addressof(arg[arg.size()]);
-                auto source = sender(arg);
+                auto source = sender_span(arg);
                 auto p = parse_cell_span();
                 for (auto const & b: source)
                 {
@@ -731,18 +746,29 @@ namespace csv_co {
                     if (const auto & r = p(); r())
                     {
                         auto res = r;
-                        if (--res.e != range_end)
+                        --res.e;
+                        vfcs_cb(res);
+                        if (*res.e == LF)
                         {
-                            vfcs_cb(res);
-                            if (*res.e == LF)
-                            {
-                                new_row_callback_();
-                            }
-                        } else // ultimate LF
-                        {
-                            vfcs_cb(res);
                             new_row_callback_();
                         }
+                    }
+                }
+
+                // in spanning mode last LF (if not in source) - gives no chance to dereference the source.
+                // Because dereference would come to non-existent position: the end().
+                // So we have to go for the trick. Otherwise, we would have to double-check for
+                // every one field in the cycle above. (See revision history)
+                if (arg.back() != LF)
+                {
+                    auto src_ = sender_span_LF(arg);
+                    p.send(*(src_.begin()));
+                    if (const auto &r = p(); r())
+                    {
+                        auto res = r;
+                        --res.e;
+                        vfcs_cb(res);
+                        new_row_callback_(); // Unconditionally
                     }
                 }
             }, src);
@@ -797,7 +823,7 @@ namespace csv_co {
             {
                 auto columns = cols();
                 auto range_end = std::addressof(arg[arg.size()]);
-                auto source = sender(arg);
+                auto source = sender_span(arg);
                 auto p = parse_cell_span();
                 auto b = source.begin();
                 while(columns)
@@ -819,18 +845,29 @@ namespace csv_co {
                     if (const auto &r = p(); r())
                     {
                         auto res = r;
-                        if (--res.e < range_end)
+                        --res.e;
+                        vfcs_cb(res);
+                        if(*(res.e) == LF)
                         {
-                            vfcs_cb(res);
-                            if(*(res.e) == LF)
-                            {
-                                new_row_callback_();
-                            }
-                        } else
-                        {
-                            vfcs_cb(res);
                             new_row_callback_();
                         }
+                    }
+                }
+
+                // in spanning mode last LF (if not in source) - gives no chance to dereference the source.
+                // Because dereference would come to non-existent position: the end().
+                // So we have to go for the trick. Otherwise, we would have to double-check for
+                // every one field in the cycle above. (See revision history)
+                if (arg.back() != LF)
+                {
+                    auto src_ = sender_span_LF(arg);
+                    p.send(*src_.begin());
+                    if (const auto &r = p(); r())
+                    {
+                        auto res = r;
+                        --res.e;
+                        vfcs_cb(res);
+                        new_row_callback_(); // Unconditionally
                     }
                 }
             },src);
