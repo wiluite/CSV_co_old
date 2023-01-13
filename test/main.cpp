@@ -513,6 +513,25 @@ int main() {
         }
 
         {
+            auto cells{0u}, rows{0u};
+            std::vector<cell_string> v;
+            reader r("1\n2");
+            r.run_lazy([&](auto &s) {
+                           std::string value;
+                           s.read_value(value);
+                           v.push_back(value);
+                           ++cells;
+                       }, [&rows] {
+                           ++rows;
+                       }
+            );
+
+            expect(cells == 2);
+            expect(rows == 2);
+            expect(v == std::vector<cell_string>{"1","2"});
+        }
+
+        {
             std::vector<cell_string> v;
             reader r(R"( "quoted from the beginning, only" with usual rest part)");
             r.run_lazy([&](auto &s) {

@@ -734,7 +734,7 @@ namespace csv_co {
                         if (--res.e != range_end)
                         {
                             vfcs_cb(res);
-                            if (*res.e == LF_subst)
+                            if (*res.e == LF)
                             {
                                 new_row_callback_();
                             }
@@ -822,7 +822,7 @@ namespace csv_co {
                         if (--res.e < range_end)
                         {
                             vfcs_cb(res);
-                            if(*(res.e) == LF_subst)
+                            if(*(res.e) == LF)
                             {
                                 new_row_callback_();
                             }
