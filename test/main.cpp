@@ -35,9 +35,17 @@ int main() {
         expect(!e);
         expect(d == 5);
 
-        s = "    \"wwww \" ";
+        s = R"(    "context " )";
         unquote(s, '"');
-        expect(s == "    wwww  ");
+        expect(s == R"(    context  )");
+
+        s = R"(    "context  )";
+        unquote(s, '"');
+        expect(s == R"(    "context  )");
+
+        s = R"(    context"  )";
+        unquote(s, '"');
+        expect(s == R"(    context"  )");
 
     };
 
@@ -286,6 +294,16 @@ int main() {
 
     };
 
+    "bug-fix LF is the last char of quoted cell "_test = [] {
+
+        auto cells {0u};
+        reader r("one,\"quoted, with \r\t\n and last\n\",three");
+        r.run([&](auto &s) {
+            expect (s == "one" || s == "quoted, with \r\t\n and last\n" || s == "three");
+        });
+
+    };
+
     // -- Topic change: File processing --
 
     "Read a well-known file"_test = [] {
@@ -473,7 +491,7 @@ int main() {
 
     };
 
-    "Reader LAZY value callbacks process hard quoted fields"_test = [] {
+    "run_lazy()'s value callbacks process hard quoted fields"_test = [] {
 
         {
             auto cells{0u}, rows{0u};
@@ -537,8 +555,8 @@ int main() {
 
     };
 
-    "Reader LAZY header and value callbacks process hard quoted fields"_test = []
-    {
+    "run_lazy()'s header and value callbacks process hard quoted fields"_test = []{
+
         {
             auto h_cells{0u}, rows{0u};
             auto v_cells{0u};

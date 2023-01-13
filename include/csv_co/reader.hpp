@@ -378,6 +378,7 @@ namespace csv_co {
         };
 
         static constexpr char LF{'\n'};
+        static constexpr char LF_subst{'\1'};
         static constexpr char special{'\0'};
 
         [[nodiscard]] inline bool limiter(char b) const noexcept
@@ -406,7 +407,7 @@ namespace csv_co {
                     dirty_trick(field);
                     if (LF == b)
                     {
-                        field.push_back(LF);
+                        field.push_back(LF_subst);
                     }
                     co_yield field;
                     field.clear();
@@ -517,21 +518,28 @@ namespace csv_co {
 
         FSM_rows parse_rows() const noexcept {
             std::optional<bool> line_end;
-            for (;;) {
+            for (;;)
+            {
                 auto b = co_await char{};
-                if (limiter(b)) {
-                    if (LF == b) {
+                if (limiter(b))
+                {
+                    if (LF == b)
+                    {
                         line_end = true;
                         co_yield line_end;
                     }
                     continue;
                 }
-                if (Quote::value == b) {
+                if (Quote::value == b)
+                {
                     unsigned quote_counter = 1;
-                    for (;;) {
+                    for (;;)
+                    {
                         b = co_await char{};
-                        if (limiter(b) && !(quote_counter & 1)) {
-                            if (LF == b) {
+                        if (limiter(b) && !(quote_counter & 1))
+                        {
+                            if (LF == b)
+                            {
                                 line_end = true;
                                 co_yield line_end;
                             }
@@ -703,8 +711,8 @@ namespace csv_co {
                     p.send(b);
                     if (const auto &res = p(); !res.empty())
                     {
-                        vf_cb(res.front()==special?(""):(res.back()!=LF?res:cell_string{res.begin(),res.end()-1}));
-                        if (res.back()==LF)
+                        vf_cb(res.front()==special?(""):(res.back()!=LF_subst?res:cell_string{res.begin(),res.end()-1}));
+                        if (res.back()==LF_subst)
                         {
                             new_row_callback_();
                         }
@@ -732,7 +740,7 @@ namespace csv_co {
                         if (--res.e != range_end)
                         {
                             vfcs_cb(res);
-                            if (*res.e == LF)
+                            if (*res.e == LF_subst)
                             {
                                 new_row_callback_();
                             }
@@ -763,7 +771,7 @@ namespace csv_co {
                     ++b;
                     if (const auto &res = p(); !res.empty())
                     {
-                        hf_cb(res.front()==special?(""):(res.back()!=LF?res:cell_string{res.begin(),res.end() - 1}));
+                        hf_cb(res.front()==special?(""):(res.back()!=LF_subst?res:cell_string{res.begin(),res.end() - 1}));
                         --columns;
                     }
                 }
@@ -775,9 +783,9 @@ namespace csv_co {
                     ++b;
                     if (const auto &res = p(); !res.empty())
                     {
-                        vf_cb(res.front()==special?(""):(res.back()!=LF?res:cell_string{res.begin(),res.end() - 1}));
+                        vf_cb(res.front()==special?(""):(res.back()!=LF_subst?res:cell_string{res.begin(),res.end() - 1}));
 
-                        if (res.back() == LF)
+                        if (res.back() == LF_subst)
                         {
                             new_row_callback_();
                         }
@@ -820,7 +828,7 @@ namespace csv_co {
                         if (--res.e < range_end)
                         {
                             vfcs_cb(res);
-                            if(*(res.e) == LF)
+                            if(*(res.e) == LF_subst)
                             {
                                 new_row_callback_();
                             }
