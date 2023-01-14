@@ -561,7 +561,7 @@ namespace csv_co {
             }
 #if 0
             // TODO: after moving this is false:
-            // But! object in "move-from state" - do not use it!
+            // But! object in "move-from state" - should not use it at all!
             assert(!r.empty());
 #else
             if (!r.empty())
@@ -594,7 +594,7 @@ namespace csv_co {
         // always user-defined: by run() or UB if user-defined nullptr
         mutable value_field_cb_t  vf_cb;
         // defaulted or user-defined by run(), or UB if user-defined nullptr
-        mutable new_row_cb_t new_row_callback_;
+        mutable new_row_cb_t new_row_cb;
 
         mutable header_field_span_cb_t hfcs_cb;
         mutable value_field_span_cb_t  vfcs_cb;
@@ -710,7 +710,7 @@ namespace csv_co {
         void run(value_field_cb_t fcb, new_row_cb_t nrc=[]{}) const
         {
             vf_cb = std::move(fcb);
-            new_row_callback_ = std::move(nrc);
+            new_row_cb = std::move(nrc);
             std::visit([&](auto&& arg)
             {
                 auto source = sender(arg);
@@ -723,7 +723,7 @@ namespace csv_co {
                         vf_cb(res.front()==special?(""):(res.back()!=LF_subst?res:cell_string{res.begin(),res.end()-1}));
                         if (res.back()==LF_subst)
                         {
-                            new_row_callback_();
+                            new_row_cb();
                         }
                     }
                 }
@@ -733,7 +733,7 @@ namespace csv_co {
         void run_lazy(value_field_span_cb_t fcb, new_row_cb_t nrc=[]{}) const
         {
             vfcs_cb = std::move(fcb);
-            new_row_callback_ = std::move(nrc);
+            new_row_cb = std::move(nrc);
 
             std::visit([this](auto&& arg) noexcept
             {
@@ -750,7 +750,7 @@ namespace csv_co {
                         vfcs_cb(res);
                         if (*res.e == LF)
                         {
-                            new_row_callback_();
+                            new_row_cb();
                         }
                     }
                 }
@@ -768,7 +768,7 @@ namespace csv_co {
                         auto res = r;
                         --res.e;
                         vfcs_cb(res);
-                        new_row_callback_(); // Unconditionally
+                        new_row_cb(); // Unconditionally
                     }
                 }
             }, src);
@@ -778,7 +778,7 @@ namespace csv_co {
         {
             hf_cb = std::move(hfcb);
             vf_cb = std::move(fcb);
-            new_row_callback_ = std::move(nrc);
+            new_row_cb = std::move(nrc);
             std::visit([&](auto&& arg)
             {
                 auto columns = cols();
@@ -795,7 +795,7 @@ namespace csv_co {
                         --columns;
                     }
                 }
-                new_row_callback_();
+                new_row_cb();
 
                 while (b != source.end())
                 {
@@ -807,7 +807,7 @@ namespace csv_co {
 
                         if (res.back() == LF_subst)
                         {
-                            new_row_callback_();
+                            new_row_cb();
                         }
                     }
                 }
@@ -818,7 +818,7 @@ namespace csv_co {
         {
             hfcs_cb = std::move(hfcb);
             vfcs_cb = std::move(fcb);
-            new_row_callback_ = std::move(nrc);
+            new_row_cb = std::move(nrc);
             std::visit([&](auto&& arg)
             {
                 auto columns = cols();
@@ -837,7 +837,7 @@ namespace csv_co {
                         --columns;
                     }
                 }
-                new_row_callback_();
+                new_row_cb();
                 while (b != source.end())
                 {
                     p.send(*b);
@@ -849,7 +849,7 @@ namespace csv_co {
                         vfcs_cb(res);
                         if(*(res.e) == LF)
                         {
-                            new_row_callback_();
+                            new_row_cb();
                         }
                     }
                 }
@@ -867,7 +867,7 @@ namespace csv_co {
                         auto res = r;
                         --res.e;
                         vfcs_cb(res);
-                        new_row_callback_(); // Unconditionally
+                        new_row_cb(); // Unconditionally
                     }
                 }
             },src);

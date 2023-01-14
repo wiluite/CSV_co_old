@@ -12,6 +12,7 @@
 *    [API](#api)
 *    [Problems](#problems)
 *    [Benchmarks](#benchmarks)
+*    [Build All](#build-all)
 
 ### About
 CSV_co is a C++20 coroutine-driven, callback-providing and safe CSV data reader, or parser. 
@@ -25,7 +26,7 @@ to be satisfied:
 - A field **can** be enclosed in double quotes.
 - If a field contains commas, line breaks, double quotes, then this field **must** be enclosed in
 double quotes.
-- The double double_quotes character in the field must be doubled.
+- The double_quotes character in the field must be doubled.
 
 ### FAQ
 > Why another parser?
@@ -138,6 +139,7 @@ current field and gives you the opportunity to get the value of this field in th
 container you provide.
 
 ### API
+
 Public API available:
 ```cpp
     using cell_string = std::basic_string<char, std::char_traits<char>, alloc<char>>;
@@ -155,11 +157,11 @@ Public API available:
         // CSV_co is movable type
         reader (reader && other) noexcept = default;
         reader & operator=(reader && other) noexcept = default;
-        
+
         // Shape
         [[nodiscard]] std::size_t cols() const noexcept;
         [[nodiscard]] std::size_t rows() const noexcept;
-        
+
         // Validation
         [[nodiscard]] reader& valid();
         
@@ -184,12 +186,15 @@ Public API available:
         using new_row_cb_t = std::function <void ()>;
     };
 ```
+
 ### Problems
+
 Frequent coroutine switching due to current byte-parsing protocol which lead to
 time-consuming overheads. Well, another approach would bring parsing clarity at
 the expense of speed. That could be easily implemented sometime.
 
 ### Benchmarks
+
 Benchmarking source is in `benchmark` folder. It measures, in lazy iteration mode, the
 average execution time (after a warmup run) for `CSV_co` to memory-map the input CSV
 file and iterate over every field in it.
@@ -216,3 +221,26 @@ cd ..
 | Benchmark folder's game.csv                                                        | 2.6M      | 100000  | 6    | 600'000     | 0.012s |
 | [Denver Crime Data](https://www.kaggle.com/paultimothymooney/denver-crime-data)    | 102M      | 399573  | 20   | 7'991'460   | 0.530s |
 | [2015 Flight Delays and Cancellations](https://www.kaggle.com/usdot/flight-delays) | 565M      | 5819080 | 31   | 180'391'480 | 3.7s   |
+
+### Build All
+
+Conventional:
+```bash
+mkdir build && cd build
+cmake ..
+make -j 4
+```
+
+Best (if you have clang, libc++-dev, libc++abi-dev packages or their analogs installed):
+```bash
+mkdir build && cd build
+cmake -DCMAKE_CXX_COMPILER=clang++ -DCLANG_STDLIB_LIBCPP=ON ..
+make -j 4
+```
+
+Check for memory safety (if you have clang sanitizers):
+```bash
+mkdir build && cd build
+cmake -DCMAKE_CXX_COMPILER=clang++ -DWITH_SANITY_CHECK=ON -DCMAKE_BUILD_TYPE=Debug ..
+make -j 4
+```
