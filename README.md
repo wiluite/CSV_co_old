@@ -16,9 +16,8 @@
 
 ### About
 CSV_co is a C++20 coroutine-driven, callback-providing and safe CSV data reader, or parser. 
-Hope, it is to a large extent in line with standard RFC 4180, because it was conceived and 
-has been developed to handle with field selection carefully. The following requirements tend
-to be satisfied:
+Hope, it is to a large extent in line with standard RFC 4180, because it was conceived to
+handle with field selection carefully. The following requirements tend to be satisfied:
 
 - Windows and Unix style line endings.
 - Optional header line.
@@ -136,7 +135,18 @@ This is somewhat more time-consuming, especially if you are interested in specif
 fields and in common would prefer to move forward faster. There is an option for
 lazier field iteration: the parser is keeping the memory span corresponding to the
 current field and gives you the opportunity to get the value of this field in the
-container you provide.
+container you provide. So, the preferable way of doing things is right underneath.
+
+"Lazy" mode, get necessary fields:
+```cpp
+    // ignore header fields, obtain value fields, trace rows:
+    reader<...> r (...);
+    r.valid().run_lazy(
+        [](auto) {}
+        ,[&](auto & s) { if ( some col or row ) { cell_string value; s.read_value(value); }}
+        ,[&]{ row++; col = 0; }
+    );
+```
 
 ### API
 
@@ -166,19 +176,19 @@ Public API available:
         [[nodiscard]] reader& valid();
         
         // Parsing
-        void run(value_field_cb_t fcb, new_row_cb_t nrc=[]{}) const;
-        void run(header_field_cb_t hfcb, value_field_cb_t fcb, new_row_cb_t nrc=[]{}) const;
-        void run_lazy(value_field_span_cb_t fcb, new_row_cb_t nrc=[]{}) const;
-        void run_lazy(header_field_span_cb_t hfcb, value_field_span_cb_t fcb, new_row_cb_t nrc=[]{}) const;
+        void run(value_field_cb_t, new_row_cb_t nrc=[]{}) const;
+        void run(header_field_cb_t, value_field_cb_t, new_row_cb_t nrc=[]{}) const;
+        void run_lazy(value_field_span_cb_t, new_row_cb_t nrc=[]{}) const;
+        void run_lazy(header_field_span_cb_t, value_field_span_cb_t, new_row_cb_t nrc=[]{}) const;
         
-        // Reading the field value in within callbacks
+        // Reading fields' values within run_lazy()
         class cell_span
         {   ///...
         public:
             void read_value(cell_string & s) const;
-        }; 
-    private:
-        // Callback types:
+        };
+
+        // Callback types
         using header_field_cb_t = std::function <void (cell_string const & value)>;
         using value_field_cb_t = std::function <void (cell_string const & value)>;
         using header_field_span_cb_t = std::function <void (cell_span const & span)>;
