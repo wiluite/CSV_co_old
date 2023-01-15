@@ -25,7 +25,7 @@ int main() {
                         sum += std::stoi(value);
                     }
                 });
-        std::cout << sum << std::endl;
+        std::cout << "Total population is: " << sum << std::endl;
     } catch (reader<>::exception const & e)
     {
         std::cout << e.what() << '\n';

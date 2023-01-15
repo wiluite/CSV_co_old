@@ -79,7 +79,7 @@ General scheme:
 
 "Energetic" mode, save all fields to a container and view a data:
 ```cpp
-  try {
+    try {
         reader_type r(std::filesystem::path("smallpop.csv"));
         std::vector<cell_string> ram;
         ram.reserve(r.cols() * r.rows());
@@ -162,9 +162,9 @@ Public API available:
         // Constructors
         explicit reader(std::filesystem::path const & csv_src);
         template <template<class> class Alloc=std::allocator>
-        explicit reader (std::basic_string<char, std::char_traits<char>, Alloc<char>> const & csv_src);
-        explicit reader (const char * csv_src);
-        // CSV_co is movable type
+        explicit reader(std::basic_string<char,std::char_traits<char>,Alloc<char>> const & csv_src);
+        explicit reader(const char * csv_src);
+        // csv_co::reader is movable type
         reader (reader && other) noexcept = default;
         reader & operator=(reader && other) noexcept = default;
 
@@ -181,7 +181,7 @@ Public API available:
         void run_lazy(value_field_span_cb_t, new_row_cb_t nrc=[]{}) const;
         void run_lazy(header_field_span_cb_t, value_field_span_cb_t, new_row_cb_t nrc=[]{}) const;
         
-        // Reading fields' values within run_lazy()
+        // Reading fields' values within run_lazy's()
         class cell_span
         {   ///...
         public:
@@ -244,13 +244,13 @@ make -j 4
 Best (if you have clang, libc++-dev, libc++abi-dev packages or their analogs installed):
 ```bash
 mkdir build && cd build
-cmake -DCMAKE_CXX_COMPILER=clang++ -DCLANG_STDLIB_LIBCPP=ON ..
+cmake -DCMAKE_CXX_COMPILER=clang++ -D_STDLIB_LIBCPP=ON ..
 make -j 4
 ```
 
 Check for memory safety (if you have clang sanitizers):
 ```bash
 mkdir build && cd build
-cmake -DCMAKE_CXX_COMPILER=clang++ -DWITH_SANITY_CHECK=ON -DCMAKE_BUILD_TYPE=Debug ..
+cmake -DCMAKE_CXX_COMPILER=clang++ -D_SANITY_CHECK=ON -DCMAKE_BUILD_TYPE=Debug ..
 make -j 4
 ```
