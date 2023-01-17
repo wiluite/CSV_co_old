@@ -251,3 +251,10 @@ mkdir build && cd build
 cmake -DCMAKE_CXX_COMPILER=clang++ -D_SANITY_CHECK=ON -DCMAKE_BUILD_TYPE=Debug ..
 make -j 4
 ```
+
+MSVC (in x64 Native Tools Command Prompt):
+```bash
+mkdir build && cd build
+cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release ..
+msbuild /property:Configuration=Release csv_co.sln
+```
