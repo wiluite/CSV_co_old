@@ -349,7 +349,7 @@ namespace csv_co {
                 assert(b!=nullptr && e!=nullptr);
                 using namespace string_functions;
                 // Obtain almost result string in its guaranteed sufficient space
-                s = std::decay_t<decltype(s)> {b,e};
+                s = std::decay_t<decltype(s)> { b,e };
                 // If the field was (completely) quoted -> it must be unquoted
                 unquote(s, Quote::value);
                 // Fields partly quoted or not-quoted at all: all must be spared from double quoting
@@ -359,20 +359,10 @@ namespace csv_co {
         };
 
         static constexpr char LF{'\n'};
-        static constexpr char LF_subst{LF};
-        static constexpr char special{'\0'};
 
         [[nodiscard]] inline auto limiter(char b) const noexcept -> bool
         {
             return Delimiter::value == b || LF == b;
-        }
-
-        inline void dirty_trick(auto & s) const
-        {
-            if (s.empty())
-            {
-                s.push_back(special);
-            }
         }
 
         auto parse() const -> FSM
@@ -385,11 +375,7 @@ namespace csv_co {
                 {
                     co_yield_label:
                     TrimPolicy::trim(field);
-                    dirty_trick(field);
-                    if (LF == b)
-                    {
-                        field.push_back(LF_subst);
-                    }
+                    field.push_back(b);
                     co_yield field;
                     field.clear();
                     continue;
@@ -703,10 +689,8 @@ namespace csv_co {
                     p.send(b);
                     if (const auto &res = p(); !res.empty())
                     {
-                        vf_cb(res.front() == special ? (std::string_view{res.begin(), res.begin()}) :
-                              (res.back()!=LF_subst?std::string_view{res.begin(),res.end()}:
-                             std::string_view{res.begin(),res.end()-1}));
-                        if (res.back()==LF_subst)
+                        vf_cb(std::string_view{res.begin(),res.end()-1});
+                        if (LF == res.back())
                         {
                             new_row_cb();
                         }
@@ -776,9 +760,7 @@ namespace csv_co {
                     ++b;
                     if (const auto &res = p(); !res.empty())
                     {
-                        hf_cb(res.front() == special ? (std::string_view{res.begin(), res.begin()}) :
-                              (res.back()!=LF_subst?std::string_view{res.begin(),res.end()}:
-                               std::string_view{res.begin(),res.end()-1}));
+                        hf_cb(std::string_view{res.begin(),res.end()-1});
                         --columns;
                     }
                 }
@@ -790,12 +772,8 @@ namespace csv_co {
                     ++b;
                     if (const auto &res = p(); !res.empty())
                     {
-                        vf_cb(res.front() == special ? (std::string_view{res.begin(), res.begin()}) :
-                              (res.back()!=LF_subst?std::string_view{res.begin(),res.end()}:
-                                std::string_view{res.begin(),res.end()-1}));
-
-
-                        if (res.back() == LF_subst)
+                        vf_cb(std::string_view{res.begin(),res.end()-1});
+                        if (LF == res.back())
                         {
                             new_row_cb();
                         }

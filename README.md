@@ -41,13 +41,6 @@ Because quotes are for *preprocessing*, not the end-users.
 
 Well, it is not the fastest. But look at [Benchmarks](#benchmarks).
 
-> You support multiline fields. Which are restrictions?
-
-There is only one limitation: your quoted multiline field cannot end with LF character:
-agree if you break lines you do that for the sake of continuation. `CSV_co` will simply
-truncate this last character of that field, otherwise the parser would have additional
-verification branches.
-
 ### Features
 - Memory-mapping CSV files.
 - Several CSV data sources.
@@ -189,14 +182,14 @@ public:
     // Reading fields' values within run_lazy's() callbacks
     class cell_span {
     public:
-        void read_value(cell_string & s) const;
+        void read_value(auto & any_container_supporting_construction_from_substring) const;
     };
 
     // Callback types
-    using header_field_cb_t = std::function <void (std::string_view value)>;
-    using value_field_cb_t = std::function <void (std::string_view value)>;
-    using header_field_span_cb_t = std::function <void (cell_span const & span)>;
-    using value_field_span_cb_t = std::function <void (cell_span const & span)>;
+    using header_field_cb_t = std::function <void (std::string_view)>;
+    using value_field_cb_t = std::function <void (std::string_view)>;
+    using header_field_span_cb_t = std::function <void (cell_span const & )>;
+    using value_field_span_cb_t = std::function <void (cell_span const & )>;
     using new_row_cb_t = std::function <void ()>;
 };
 ```

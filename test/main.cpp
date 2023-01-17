@@ -299,7 +299,7 @@ int main() {
         auto cells {0u};
         reader r("one,\"quoted, with \r\t\n and last\n\",three");
         r.run([&](auto s) {
-            expect (s == "one" || s == "quoted, with \r\t\n and last" || s == "three");
+            expect (s == "one" || s == "quoted, with \r\t\n and last\n" || s == "three");
         });
 
     };
