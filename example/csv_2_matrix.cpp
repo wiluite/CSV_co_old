@@ -20,7 +20,7 @@ int main()
         // ignore header fields, obtain value fields, and trace rows:
         r.run(
                 [](auto){}
-                ,[&](auto & s){ matrix[c_row][c_col++] = s; }
+                ,[&](auto s){ matrix[c_row][c_col++] = s; }
                 ,[&] { c_row++; c_col = 0; }
         );
 

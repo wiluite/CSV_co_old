@@ -79,8 +79,8 @@ int main() {
 
         auto cells{0u};
         reader r("1,2,3\n4,5,6\n7,8,9\n");
-        r.run([&](auto &s) {
-            static_assert(std::is_same_v<decltype(s), const cell_string &>);
+        r.run([&](auto s) {
+            static_assert(std::is_same_v<decltype(s), std::string_view>);
             ++cells;
         });
 
@@ -92,8 +92,8 @@ int main() {
 
         auto cells{0u};
         reader r(cell_string("1,2,3\n4,5,6\n"));
-        r.run([&](auto &s) {
-            static_assert(std::is_same_v<decltype(s), const cell_string &>);
+        r.run([&](auto s) {
+            static_assert(std::is_same_v<decltype(s), std::string_view>);
             ++cells;
         });
 
@@ -105,7 +105,7 @@ int main() {
 
         auto cells{0u}, rows{0u};
         reader r("one,two,three\nfour,five,six\nseven,eight,nine\n");
-        r.run([&](auto &s) {
+        r.run([&](auto s) {
             cells++;
         }, [&]() {
             rows++;
@@ -143,8 +143,8 @@ int main() {
 
         std::vector<cell_string> v;
         reader r("one,two,three\n four, five, six\nseven,eight,nine\n");
-        r.run([&](auto &s) {
-            v.push_back(s);
+        r.run([&](auto s) {
+            v.emplace_back(s);
         });
 
         std::vector<cell_string> v2{"one", "two", "three", " four", " five", " six", "seven", "eight", "nine"};
@@ -159,8 +159,8 @@ int main() {
         reader<trim_policy::alltrim>
                 r("one, \ttwo , three \n four, five, six\n seven , eight\t , nine\r\n");
 
-        r.run([&](auto &s) {
-            v.push_back(s);
+        r.run([&](auto s) {
+            v.emplace_back(s);
         });
 
         std::vector<cell_string> v2{"one", "two", "three", "four", "five", "six", "seven", "eight", "nine"};
@@ -172,8 +172,8 @@ int main() {
 
         std::vector<cell_string> v;
         reader r("one,two,three\nfour,five,six");
-        r.run([&](auto &s) {
-            v.push_back(s);
+        r.run([&](auto s) {
+            v.emplace_back(s);
         });
 
         expect(v.size() == 6);
@@ -188,8 +188,8 @@ int main() {
         using new_delimiter = delimiter<';'>;
 
         reader<trim_policy::no_trimming, double_quotes, new_delimiter> r("one;two;three\nfour;five;six");
-        r.run([&](auto &s) {
-            v.push_back(s);
+        r.run([&](auto s) {
+            v.emplace_back(s);
         });
 
         expect(v.size() == 6);
@@ -201,8 +201,8 @@ int main() {
 
         std::vector<cell_string> v;
         reader r("one,two,three\nfour,,six");
-        r.run([&](auto &s) {
-            v.push_back(s);
+        r.run([&](auto s) {
+            v.emplace_back(s);
         });
 
         expect(v.size() == 6);
@@ -218,9 +218,9 @@ int main() {
         std::vector<cell_string> v;
         std::size_t cells{0};
         reader r(R"(2022, Mouse, "It's incorrect to use "Hello, Christmas Tree!"" ,, "4900,00")");
-        r.run([&](auto &s) {
+        r.run([&](auto s) {
             cells++;
-            v.push_back(s);
+            v.emplace_back(s);
         });
 
         expect(cells == 6);
@@ -235,9 +235,9 @@ int main() {
         std::size_t cells{0};
         reader r(R"(2022, Mouse, "It's a correct use case: ""Hello, Christmas Tree!""" ,, "4900,00")");
 
-        r.run([&](auto &s) {
+        r.run([&](auto s) {
             cells++;
-            v.push_back(s);
+            v.emplace_back(s);
         });
 
         expect(cells == 5);
@@ -251,9 +251,9 @@ int main() {
         std::vector<cell_string> v;
         std::size_t cells{0};
         reader r(R"(2022,Mouse,What is quoted is necessary part "Hello, Tree!" of the cell,,"4900,00")");
-        r.run([&](auto &s) {
+        r.run([&](auto s) {
             cells++;
-            v.push_back(s);
+            v.emplace_back(s);
         });
 
         expect(cells == 5);
@@ -267,7 +267,7 @@ int main() {
         constexpr std::size_t CORRECT_RESULT = 1;
         auto cells{0u};
         reader r(R"("just one, and only one, quoted cell")");
-        r.run([&](auto &s) {
+        r.run([&](auto s) {
             cells++;
         });
         expect(cells == CORRECT_RESULT);
@@ -275,7 +275,7 @@ int main() {
         constexpr std::size_t INCORRECT_RESULT = 3;
         cells = 0u;
         reader r2(R"(`just one, and only one, quoted cell`)");
-        r2.run([&](auto &s) {
+        r2.run([&](auto s) {
             cells++;
         });
         expect(cells == INCORRECT_RESULT);
@@ -286,7 +286,7 @@ int main() {
         using new_quote_char = quote_char<'`'>;
 
         reader<trim_policy::no_trimming, new_quote_char> r3(R"(`just one, and only one, quoted cell`)");
-        r3.run([&](auto &s) {
+        r3.run([&](auto s) {
             expect(s == "just one, and only one, quoted cell");
             cells++;
         });
@@ -298,8 +298,8 @@ int main() {
 
         auto cells {0u};
         reader r("one,\"quoted, with \r\t\n and last\n\",three");
-        r.run([&](auto &s) {
-            expect (s == "one" || s == "quoted, with \r\t\n and last\n" || s == "three");
+        r.run([&](auto s) {
+            expect (s == "one" || s == "quoted, with \r\t\n and last" || s == "three");
         });
 
     };
@@ -314,7 +314,7 @@ int main() {
 
         expect(nothrow([&] {
                    reader r(std::filesystem::path("game.csv"));
-                   r.run([&](auto &s) {
+                   r.run([&](auto s) {
                        cells++;
                        if (rows < 1) {
                            first_string += s;
@@ -346,7 +346,7 @@ int main() {
 
         expect(throws([&] {
                    reader r(std::filesystem::path("empty.csv"));
-                   r.run([&](auto &s) {
+                   r.run([&](auto s) {
                        cells++;
                    }, [&] {
                        rows++;
@@ -366,10 +366,10 @@ int main() {
         expect(nothrow([&] {
                    static char const chars[] = "\r";
                    reader<trim_policy::trimming<chars>> r(std::filesystem::path("smallpop.csv"));
-                   r.run([&](auto &s) {
-                             v.push_back(s);
-                         }, [&](auto &s) {
-                             v2.push_back(s);
+                   r.run([&](auto s) {
+                             v.emplace_back(s);
+                         }, [&](auto s) {
+                             v2.emplace_back(s);
                              cells++;
                          }, [&] {
                              rows++;

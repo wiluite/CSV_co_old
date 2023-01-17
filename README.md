@@ -15,17 +15,18 @@
 *    [Build All](#build-all)
 
 ### About
-CSV_co is a C++20 coroutine-driven, callback-providing and safe CSV data reader, or parser. 
-Hope, it is to a large extent in line with standard RFC 4180, because it was conceived to
-handle with field selection carefully. The following requirements tend to be satisfied:
+CSV_co is a C++20 coroutine-driven, callback-providing and stable CSV data reader, or parser.
+Hope, it is in line with standard RFC 4180 because was conceived to handle with field selection
+carefully. The following requirements tend to be satisfied:
 
 - Windows and Unix style line endings.
 - Optional header line.
 - Each row (record) must contain the same number of fields.
 - A field **can** be enclosed in double quotes.
-- If a field contains commas, line breaks, double quotes, then this field **must** be enclosed in
-double quotes.
-- The double_quotes character in the field must be doubled.
+- If a field contains commas, line breaks, double quotes, then this field **must** be enclosed in double
+quotes.
+- The double-quotes character in the field must be doubled.
+- [Extension: partly double-quoted fields: unquoted string field with arbitrarily double-quoted parts]
 
 ### FAQ
 > Why another parser?
@@ -38,8 +39,14 @@ Because quotes are for *preprocessing*, not the end-users.
 
 > How fast is it?
 
-Well, it is not the fastest. But look at [Benchmarks](#benchmarks). Remember, iteration speed
-dissolves in data processing times.
+Well, it is not the fastest. But look at [Benchmarks](#benchmarks).
+
+> You support multiline fields. Which are restrictions?
+
+There is only one limitation: your quoted multiline field cannot end with LF character:
+agree if you break lines you do that for the sake of continuation. `CSV_co` will simply
+truncate this last character of that field, otherwise the parser would have additional
+verification branches.
 
 ### Features
 - Memory-mapping CSV files.
@@ -61,68 +68,67 @@ dissolves in data processing times.
   - MinGW with GCC 10.2 C++ compiler
 
 ### Acknowledgments
-To A. Fertig for coroutine tutorials and code that was highly borrowed.
+To Andreas Fertig for coroutine tutorials and code which were highly borrowed.
 
 ### Example
 General scheme:
 ```cpp
-    #include <csv_co/reader.hpp>
+#include <csv_co/reader.hpp>
 
-    using namespace csv_co;
-    using reader_type = reader< trimming_policy >;
+using namespace csv_co;
+using reader_type = reader< trimming_policy >;
 
-    reader_type r( CSV_source );
-    r.run([](auto & s) {
-        // do something with field s
-    });
+reader_type r( CSV_source );
+r.run([](auto s) {
+    // do something with field
+});
 ```
 
 "Energetic" mode, save all fields to a container and view a data:
 ```cpp
-    try {
-        reader_type r(std::filesystem::path("smallpop.csv"));
-        std::vector<cell_string> ram;
-        ram.reserve(r.cols() * r.rows());
-        r.valid().run( // check validity and run
-        [](auto) {
-            // ignore header fields
-        }
-        ,[&ram](auto s) {
-            // save value fields
-            ram.push_back(std::move(s));
-        });
-        // population of Southborough,MA:
-        std::cout << ram [0] << ',' << ram[1] << ':' << ram[3] << '\n';
-
-    } catch (reader_type::exception const & e)
-    {
-        std::cout << e.what() << '\n';
+try {
+    reader_type r(std::filesystem::path("smallpop.csv"));
+    std::vector<cell_string> ram;
+    ram.reserve(r.cols() * r.rows());
+    r.valid().run( // check validity and run
+    [](auto) {
+        // ignore header fields
     }
+    ,[&ram](auto s) {
+        // save value fields
+        ram.emplace_back(s);
+    });
+
+    // population of Southborough,MA:
+    std::cout << ram [0] << ',' << ram[1] << ':' << ram[3] << '\n';
+} catch (reader_type::exception const & e) {
+    std::cout << e.what() << '\n';
+}
 ```
 
 "Energetic" mode, use `new row` callback to facilitate filling a matrix:
 ```cpp
-    try {
-        reader<trim_policy::alltrim> r (std::filesystem::path("smallpop.csv"));
-        some_matrix_class matrix (shape);
+try {
+    reader<trim_policy::alltrim> r (std::filesystem::path("smallpop.csv"));
+    some_matrix_class matrix (shape);
 
-        auto c_row {-1}; // will be incremented automatically
-        auto c_col {0u};
+    auto c_row {-1}; // will be incremented automatically
+    auto c_col {0u};
 
-        // ignore header fields, obtain value fields, and trace rows:
-        r.run([](auto) {}
-              ,[&](auto & s){ matrix[c_row][c_col++] = s; } 
-              ,[&]{ c_row++; c_col = 0; });
+    // ignore header fields, obtain value fields, and trace rows:
+    r.run([](auto) {}
+         ,[&](auto s){ matrix[c_row][c_col++] = s; } 
+         ,[&]{ c_row++; c_col = 0; });
 
-        // population of Southborough,MA
-        std::cout << matrix[0][0] << ',' << matrix[0][1] << ':' << matrix[0][3] << '\n';
-    } catch (reader_type::exception const & e) {/* handler */}
+    // population of Southborough,MA
+    std::cout << matrix[0][0] << ',' << matrix[0][1] << ':' << matrix[0][3] << '\n';
+} catch (reader_type::exception const & e) {/* handler */}
 ```
 
 String CSV source:
 ```cpp
-    reader (R"("William said: ""I am going home, but someone always bothers me""","Movie ""Falling down""")")
-    .run([](auto & s) {
+reader (R"("William said: ""I am going home, but someone always bothers me""","Movie ""Falling down""")")
+    .run([](auto s) {
         assert(
             s == R"(William said: "I am going home, but someone always bothers me")"
             || s == R"(Movie "Falling down")"
@@ -130,82 +136,80 @@ String CSV source:
     });
 ```
 
-However, in above examples parser works hard to select, prepare and provide every field.
-This is somewhat more time-consuming, especially if you are interested in specific
-fields and in common would prefer to move forward faster. There is an option for
-lazier field iteration: the parser is keeping the memory span corresponding to the
-current field and gives you the opportunity to get the value of this field in the
-container you provide. So, the preferable way of doing things is right underneath.
+In above examples parser works hard to select, prepare and provide every field. This is
+somewhat more time-consuming, especially if you are interested in specific fields and in
+common would prefer to move forward faster. There is an option for lazier field iteration:
+the parser is keeping the memory span corresponding to the current field and gives you the
+opportunity to get the value of this field in the container you provide. So, preferable way
+of doing things is right underneath.
 
 "Lazy" mode, get necessary fields:
 ```cpp
-    // ignore header fields, obtain value fields, trace rows:
-    reader<...> r (...);
-    r.valid().run_lazy(
-        [](auto) {}
-        ,[&](auto & s) { if ( some col or row ) { cell_string value; s.read_value(value); }}
-        ,[&]{ row++; col = 0; }
-    );
+// ignore header fields, obtain value fields, trace rows:
+reader<...> r (...);
+r.valid().run_lazy(
+     [](auto) {}
+    ,[&](auto & s) { if (some col or row) { cell_string value; s.read_value(value); }}
+    ,[&]{ row++; col = 0; });
 ```
 
 ### API
 
 Public API available:
 ```cpp
-    using cell_string = std::basic_string<char, std::char_traits<char>, alloc<char>>;
+using cell_string = std::basic_string<char, std::char_traits<char>, allocator<char>>;
     
-    template <TrimPolicyConcept TrimPolicy = trim_policy::no_trimming
-            , QuoteConcept Quote = double_quotes, DelimiterConcept Delimiter = comma_delimiter>
-    class reader
-    {
+template <TrimPolicyConcept TrimPolicy = trim_policy::no_trimming
+        , QuoteConcept Quote = double_quotes, DelimiterConcept Delimiter = comma_delimiter>
+class reader {
+public:
+    // Constructors
+    explicit reader(std::filesystem::path const & csv_src);
+    template <template<class> class Alloc=std::allocator>
+    explicit reader(std::basic_string<char,std::char_traits<char>,Alloc<char>> const & csv_src);
+    explicit reader(const char * csv_src);
+
+    // csv_co::reader is movable type
+    reader (reader && other) noexcept = default;
+    reader & operator=(reader && other) noexcept = default;
+
+    // Shape
+    [[nodiscard]] std::size_t cols() const noexcept;
+    [[nodiscard]] std::size_t rows() const noexcept;
+
+    // Validation
+    [[nodiscard]] reader& valid();
+        
+    // Parsing
+    void run(value_field_cb_t, new_row_cb_t nrc=[]{}) const;
+    void run(header_field_cb_t, value_field_cb_t, new_row_cb_t nrc=[]{}) const;
+    void run_lazy(value_field_span_cb_t, new_row_cb_t nrc=[]{}) const;
+    void run_lazy(header_field_span_cb_t, value_field_span_cb_t, new_row_cb_t nrc=[]{}) const;
+        
+    // Reading fields' values within run_lazy's() callbacks
+    class cell_span {
     public:
-        // Constructors
-        explicit reader(std::filesystem::path const & csv_src);
-        template <template<class> class Alloc=std::allocator>
-        explicit reader(std::basic_string<char,std::char_traits<char>,Alloc<char>> const & csv_src);
-        explicit reader(const char * csv_src);
-        // csv_co::reader is movable type
-        reader (reader && other) noexcept = default;
-        reader & operator=(reader && other) noexcept = default;
-
-        // Shape
-        [[nodiscard]] std::size_t cols() const noexcept;
-        [[nodiscard]] std::size_t rows() const noexcept;
-
-        // Validation
-        [[nodiscard]] reader& valid();
-        
-        // Parsing
-        void run(value_field_cb_t, new_row_cb_t nrc=[]{}) const;
-        void run(header_field_cb_t, value_field_cb_t, new_row_cb_t nrc=[]{}) const;
-        void run_lazy(value_field_span_cb_t, new_row_cb_t nrc=[]{}) const;
-        void run_lazy(header_field_span_cb_t, value_field_span_cb_t, new_row_cb_t nrc=[]{}) const;
-        
-        // Reading fields' values within run_lazy's()
-        class cell_span
-        {   ///...
-        public:
-            void read_value(cell_string & s) const;
-        };
-
-        // Callback types
-        using header_field_cb_t = std::function <void (cell_string const & value)>;
-        using value_field_cb_t = std::function <void (cell_string const & value)>;
-        using header_field_span_cb_t = std::function <void (cell_span const & span)>;
-        using value_field_span_cb_t = std::function <void (cell_span const & span)>;
-        using new_row_cb_t = std::function <void ()>;
+        void read_value(cell_string & s) const;
     };
+
+    // Callback types
+    using header_field_cb_t = std::function <void (std::string_view value)>;
+    using value_field_cb_t = std::function <void (std::string_view value)>;
+    using header_field_span_cb_t = std::function <void (cell_span const & span)>;
+    using value_field_span_cb_t = std::function <void (cell_span const & span)>;
+    using new_row_cb_t = std::function <void ()>;
+};
 ```
 
 ### Problems
 
-Frequent coroutine switching due to current byte-parsing protocol which lead to
-time-consuming overheads. Well, another approach would bring parsing clarity at
-the expense of speed. That could be easily implemented sometime.
+Frequent coroutine switching due to current byte-parsing protocol which lead to time-consuming
+overheads. Well, another approach would bring parsing clarity at the expense of speed. That
+may be easily implemented sometime.
 
 ### Benchmarks
 
-Benchmarking source is in `benchmark` folder. It measures, in lazy iteration mode, the
+Benchmarking source code is in `benchmark` folder. It measures, in lazy iteration mode, the
 average execution time (after a warmup run) for `CSV_co` to memory-map the input CSV
 file and iterate over every field in it.
 ```bash

@@ -106,23 +106,18 @@ namespace csv_co {
 
     namespace string_functions
     {
-
-        inline
-        bool devastated(auto const & s)
+        inline auto devastated(auto const & s) -> bool
         {
             return (s.find_first_not_of(" \n\r\t") == std::string::npos);
         }
 
-        std::pair<bool,std::size_t>
-        inline
-        begins_with(auto const & s, char ch='"' )
+        inline auto begins_with(auto const & s, char ch='"' ) -> std::pair<bool,std::size_t>
         {
             auto const d = s.find_first_not_of(" \n\r\t");
             return {(d != std::string::npos && s[d] == ch), d};
         }
 
-        inline
-        bool del_last (auto & source, char ch='"')
+        inline auto del_last (auto & source, char ch='"') -> bool
         {
             auto const pos = source.find_last_of(ch);
             assert (pos != std::string::npos);
@@ -130,26 +125,21 @@ namespace csv_co {
             return devastated(std::decay_t<decltype(source)>{sv.begin(), sv.end()}) && (source.erase(pos, 1), true);
         }
 
-        inline
-        void unquote(cell_string &s, char ch)
+        inline void unquote (cell_string &s, char ch)
         {
             auto const [ret,pos] = begins_with(s, ch);
-            if (ret && del_last(s, ch))
-            {
+            if (ret && del_last(s, ch)) {
                 s.erase(pos, 1);
             }
         }
 
-        inline
-        void unique_quote (auto & s, char q)
+        inline void unique_quote (auto & s, char q)
         {
-            auto const last = unique(s.begin(), s.end(), [q](auto const& first, auto const& second)
-            {
+            auto const last = unique(s.begin(), s.end(), [q](auto const& first, auto const& second) {
                 return first==q && second==q;
             });
             s.erase(last, s.end());
         }
-
     }
 
     template <TrimPolicyConcept TrimPolicy = trim_policy::no_trimming
@@ -300,8 +290,8 @@ namespace csv_co {
             using PromiseTypeHandle = std::coroutine_handle<promise_type>;
             using iterator          = coro_iterator<promise_type>;
 
-            iterator begin() { return {mCoroHdl}; }
-            iterator end() { return {}; }
+            auto begin() -> iterator { return {mCoroHdl}; }
+            auto end() -> iterator { return {}; }
 
             generator(generator const&) = delete;
             generator (generator&& rhs) noexcept
@@ -324,22 +314,18 @@ namespace csv_co {
             PromiseTypeHandle mCoroHdl;
         };
 
-        // parsing State Machines:
+        // parsing state machines:
         using FSM = async_generator<cell_string, char>;
         using FSM_cols = async_generator<std::optional<std::size_t>, char>;
         using FSM_rows = async_generator<std::optional<bool>, char>;
-
         class cell_span;
-
         using FSM_cell_span = async_generator<cell_span, char>;
 
         // callback types:
-        using header_field_cb_t = std::function <void (cell_string const & value)>;
-        using value_field_cb_t = std::function <void (cell_string const & value)>;
-
+        using header_field_cb_t = std::function <void (std::string_view value)>;
+        using value_field_cb_t = std::function <void (std::string_view value)>;
         using header_field_span_cb_t = std::function <void (cell_span const & span)>;
         using value_field_span_cb_t = std::function <void (cell_span const & span)>;
-
         using new_row_cb_t = std::function <void ()>;
 
         class cell_span
@@ -348,40 +334,37 @@ namespace csv_co {
             typename cell_string::const_pointer b = nullptr;
             typename cell_string::const_pointer e = nullptr;
 
-            inline bool operator()() const noexcept { return (b != nullptr); }
+            inline auto operator()() const noexcept -> bool { return (b != nullptr); }
             inline void clear () {b = nullptr;}
 
-            friend FSM_cell_span reader::parse_cell_span() const noexcept;
+            friend auto reader::parse_cell_span() const noexcept -> FSM_cell_span;
             friend void reader::run_lazy(value_field_span_cb_t, new_row_cb_t) const;
             friend void reader::run_lazy(header_field_span_cb_t, value_field_span_cb_t, new_row_cb_t) const;
             template<typename T, typename U>
             friend struct async_generator;
 
         public:
-            void read_value(cell_string & s) const
+            void read_value(auto & s) const
             {
                 assert(b!=nullptr && e!=nullptr);
                 using namespace string_functions;
-
-                // obtain almost result string in its guaranteed sufficient space
-                s = cell_string {b,e}; // automatically reserved necessary space.
-
-                // if the field was (completely) quoted -> it must be unquoted
+                // Obtain almost result string in its guaranteed sufficient space
+                s = std::decay_t<decltype(s)> {b,e};
+                // If the field was (completely) quoted -> it must be unquoted
                 unquote(s, Quote::value);
-
-                // fields partly quoted or not-quoted at all: all must be spared from double quoting
+                // Fields partly quoted or not-quoted at all: all must be spared from double quoting
                 unique_quote(s, Quote::value);
                 TrimPolicy::trim(s);
             }
         };
 
         static constexpr char LF{'\n'};
-        static constexpr char LF_subst{'\1'};
+        static constexpr char LF_subst{LF};
         static constexpr char special{'\0'};
 
-        [[nodiscard]] inline bool limiter(char b) const noexcept
+        [[nodiscard]] inline auto limiter(char b) const noexcept -> bool
         {
-            return (Delimiter::value == b) || (LF == b);
+            return Delimiter::value == b || LF == b;
         }
 
         inline void dirty_trick(auto & s) const
@@ -392,7 +375,7 @@ namespace csv_co {
             }
         }
 
-        FSM parse() const
+        auto parse() const -> FSM
         {
             cell_string field;
             for(;;)
@@ -428,7 +411,7 @@ namespace csv_co {
                                 string_functions::del_last(field, Quote::value);
 
                             string_functions::unique_quote(field, Quote::value);
-                            goto co_yield_label; // What? Yes, it IS!
+                            goto co_yield_label; // What? Yes...
                         }
                         quote_counter += (Quote::value == b) ? 1 : 0;
                         field.push_back(b);
@@ -438,7 +421,7 @@ namespace csv_co {
             }
         }
 
-        FSM_cell_span parse_cell_span() const noexcept
+        auto parse_cell_span() const noexcept -> FSM_cell_span
         {
             cell_span noopt_span;
 
@@ -476,7 +459,7 @@ namespace csv_co {
             }
         }
 
-        FSM_cols parse_cols() const noexcept
+        auto parse_cols() const noexcept -> FSM_cols
         {
             std::optional<std::size_t> cols = 0;
             for(;;)
@@ -514,7 +497,7 @@ namespace csv_co {
             }
         }
 
-        FSM_rows parse_rows() const noexcept
+        auto parse_rows() const noexcept -> FSM_rows
         {
             std::optional<bool> line_end;
             for (;;)
@@ -553,7 +536,7 @@ namespace csv_co {
         using coroutine_stream_type = mio::ro_mmap::value_type;
 
         template <typename Range>
-        generator<coroutine_stream_type> sender(Range const & r) const
+        auto sender(Range const & r) const -> generator<coroutine_stream_type>
         {
             for (auto e : r)
             {
@@ -573,7 +556,7 @@ namespace csv_co {
         }
 
         template <typename Range>
-        generator<coroutine_stream_type> sender_span(Range const & r) const
+        auto sender_span(Range const & r) const -> generator<coroutine_stream_type>
         {
             for (auto e : r)
             {
@@ -581,7 +564,7 @@ namespace csv_co {
             }
         }
         template <typename Range>
-        generator<coroutine_stream_type> sender_span_LF(Range const & r) const
+        auto sender_span_LF(Range const &) const -> generator<coroutine_stream_type>
         {
             co_yield '\n';
         }
@@ -589,7 +572,7 @@ namespace csv_co {
 
         std::variant<mio::ro_mmap, cell_string> src;
 
-        // nullptr by default, or used-default by run(). UB if nullptr
+        // nullptr by default, or user-defined by run(). UB if nullptr
         mutable header_field_cb_t hf_cb;
         // always user-defined: by run() or UB if user-defined nullptr
         mutable value_field_cb_t  vf_cb;
@@ -629,9 +612,9 @@ namespace csv_co {
         explicit reader (const char * csv_src) : reader(cell_string(csv_src)) {}
 
         reader (reader && other) noexcept = default;
-        reader & operator=(reader && other) noexcept = default;
+        auto operator=(reader && other) noexcept -> reader & = default;
 
-        [[nodiscard]] std::size_t cols() const noexcept
+        [[nodiscard]] auto cols() const noexcept -> std::size_t
         {
             auto result {0};
             std::visit([&](auto&& arg)
@@ -651,7 +634,7 @@ namespace csv_co {
             return result;
         }
 
-        [[nodiscard]] std::size_t rows() const noexcept
+        [[nodiscard]] auto rows() const noexcept -> std::size_t
         {
             auto rows {0};
 
@@ -672,7 +655,7 @@ namespace csv_co {
             return rows;
         }
 
-        [[nodiscard]] reader& valid()
+        [[nodiscard]] auto valid() -> reader&
         {
             std::visit([&](auto&& arg)
             {
@@ -720,7 +703,9 @@ namespace csv_co {
                     p.send(b);
                     if (const auto &res = p(); !res.empty())
                     {
-                        vf_cb(res.front()==special?(""):(res.back()!=LF_subst?res:cell_string{res.begin(),res.end()-1}));
+                        vf_cb(res.front() == special ? (std::string_view{res.begin(), res.begin()}) :
+                              (res.back()!=LF_subst?std::string_view{res.begin(),res.end()}:
+                             std::string_view{res.begin(),res.end()-1}));
                         if (res.back()==LF_subst)
                         {
                             new_row_cb();
@@ -746,7 +731,7 @@ namespace csv_co {
                     if (const auto & r = p(); r())
                     {
                         auto res = r;
-                        --res.e;
+                        res.e--;
                         vfcs_cb(res);
                         if (*res.e == LF)
                         {
@@ -791,7 +776,9 @@ namespace csv_co {
                     ++b;
                     if (const auto &res = p(); !res.empty())
                     {
-                        hf_cb(res.front()==special?(""):(res.back()!=LF_subst?res:cell_string{res.begin(),res.end() - 1}));
+                        hf_cb(res.front() == special ? (std::string_view{res.begin(), res.begin()}) :
+                              (res.back()!=LF_subst?std::string_view{res.begin(),res.end()}:
+                               std::string_view{res.begin(),res.end()-1}));
                         --columns;
                     }
                 }
@@ -803,7 +790,10 @@ namespace csv_co {
                     ++b;
                     if (const auto &res = p(); !res.empty())
                     {
-                        vf_cb(res.front()==special?(""):(res.back()!=LF_subst?res:cell_string{res.begin(),res.end() - 1}));
+                        vf_cb(res.front() == special ? (std::string_view{res.begin(), res.begin()}) :
+                              (res.back()!=LF_subst?std::string_view{res.begin(),res.end()}:
+                                std::string_view{res.begin(),res.end()-1}));
+
 
                         if (res.back() == LF_subst)
                         {
@@ -822,7 +812,6 @@ namespace csv_co {
             std::visit([&](auto&& arg)
             {
                 auto columns = cols();
-                auto range_end = std::addressof(arg[arg.size()]);
                 auto source = sender_span(arg);
                 auto p = parse_cell_span();
                 auto b = source.begin();
@@ -832,9 +821,9 @@ namespace csv_co {
                     ++b;
                     if (auto res = p(); res())
                     {
-                        --res.e;
+                        res.e--;
                         hfcs_cb(res);
-                        --columns;
+                        columns--;
                     }
                 }
                 new_row_cb();
@@ -845,7 +834,7 @@ namespace csv_co {
                     if (const auto &r = p(); r())
                     {
                         auto res = r;
-                        --res.e;
+                        res.e--;
                         vfcs_cb(res);
                         if(*(res.e) == LF)
                         {
@@ -865,7 +854,7 @@ namespace csv_co {
                     if (const auto &r = p(); r())
                     {
                         auto res = r;
-                        --res.e;
+                        res.e--;
                         vfcs_cb(res);
                         new_row_cb(); // Unconditionally
                     }
@@ -881,7 +870,7 @@ namespace csv_co {
                 save_details(args...);
             }
 
-            [[nodiscard]] constexpr char const* what() const noexcept override
+            [[nodiscard]] constexpr auto what() const noexcept -> char const* override
             {
               return msg.c_str();
             }
