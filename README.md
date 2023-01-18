@@ -26,7 +26,7 @@ carefully. The following requirements tend to be satisfied:
 - If a field contains commas, line breaks, double quotes, then this field **must** be enclosed in double
 quotes.
 - The double-quotes character in the field must be doubled.
-- [Extension: partly double-quoted fields: unquoted string field with arbitrarily double-quoted parts]
+- Extension: partly double-quoted fields (non-quoted string fields with arbitrarily double-quoted parts)
 
 ### FAQ
 > Why another parser?
@@ -39,7 +39,7 @@ Because quotes are for *preprocessing*, not the end-users.
 
 > How fast is it?
 
-Well, it is not the fastest. But look at [Benchmarks](#benchmarks).
+Well, it is far from being the fastest. But look at [Benchmarks](#benchmarks).
 
 ### Features
 - Memory-mapping CSV files.
@@ -227,8 +227,8 @@ cd ..
 | Dataset                                                                            | File Size | Rows    | Cols | Cells       | Time   |
 |------------------------------------------------------------------------------------|-----------|---------|------|-------------|--------|
 | Benchmark folder's game.csv                                                        | 2.6M      | 100000  | 6    | 600'000     | 0.012s |
-| [Denver Crime Data](https://www.kaggle.com/paultimothymooney/denver-crime-data)    | 102M      | 399573  | 20   | 7'991'460   | 0.530s |
-| [2015 Flight Delays and Cancellations](https://www.kaggle.com/usdot/flight-delays) | 565M      | 5819080 | 31   | 180'391'480 | 3.7s   |
+| [Denver Crime Data](https://www.kaggle.com/paultimothymooney/denver-crime-data)    | 102M      | 399573  | 20   | 7'991'460   | 0.524s |
+| [2015 Flight Delays and Cancellations](https://www.kaggle.com/usdot/flight-delays) | 565M      | 5819080 | 31   | 180'391'480 | 3.55s  |
 
 ### Build All
 
