@@ -153,7 +153,8 @@ Public API available:
 using cell_string = std::basic_string<char, std::char_traits<char>, allocator<char>>;
     
 template <TrimPolicyConcept TrimPolicy = trim_policy::no_trimming
-        , QuoteConcept Quote = double_quotes, DelimiterConcept Delimiter = comma_delimiter>
+        , QuoteConcept Quote = double_quotes
+        , DelimiterConcept Delimiter = comma_delimiter>
 class reader {
 public:
     // Constructors
