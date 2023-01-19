@@ -491,13 +491,13 @@ int main() {
 
     };
 
-    "run_lazy()'s value callbacks process hard quoted fields"_test = [] {
+    "run_span()'s value callbacks process hard quoted fields"_test = [] {
 
         {
             auto cells{0u}, rows{0u};
             std::vector<cell_string> v;
             reader r(R"( "It's a correct use case: ""Hello, Christmas Tree!""" )");
-            r.run_lazy([&](auto &s) {
+            r.run_span([&](auto &s) {
                            std::string value;
                            s.read_value(value);
                            v.push_back(value);
@@ -516,7 +516,7 @@ int main() {
             auto cells{0u}, rows{0u};
             std::vector<cell_string> v;
             reader r("1\n2");
-            r.run_lazy([&](auto &s) {
+            r.run_span([&](auto &s) {
                            std::string value;
                            s.read_value(value);
                            v.push_back(value);
@@ -534,7 +534,7 @@ int main() {
         {
             std::vector<cell_string> v;
             reader r(R"( "quoted from the beginning, only" with usual rest part)");
-            r.run_lazy([&](auto &s) {
+            r.run_span([&](auto &s) {
                            cell_string value;
                            s.read_value(value);
                            v.push_back(value);
@@ -547,7 +547,7 @@ int main() {
         {
             std::vector<cell_string> v;
             reader r(R"( " quoted from the beginning, only (with inner ""a , b"") " with usual rest part)");
-            r.run_lazy([&](auto &s) {
+            r.run_span([&](auto &s) {
                            cell_string value;
                            s.read_value(value);
                            v.push_back(value);
@@ -561,7 +561,7 @@ int main() {
         {
             std::vector<cell_string> v;
             reader r(R"( quoted in the "middle, only (with inner ""a , b"") " with usual rest part)");
-            r.run_lazy([&](auto &s) {
+            r.run_span([&](auto &s) {
                            cell_string value;
                            s.read_value(value);
                            v.push_back(value);
@@ -574,7 +574,7 @@ int main() {
 
     };
 
-    "run_lazy()'s header and value callbacks process hard quoted fields"_test = []{
+    "run_span()'s header and value callbacks process hard quoted fields"_test = []{
 
         {
             auto h_cells{0u}, rows{0u};
@@ -583,19 +583,17 @@ int main() {
             std::vector<cell_string> v2;
             reader r(R"( "It's a correct use case: ""Hello, Christmas Tree!"""
 "It's a correct use case: ""Hello, Christmas Tree!""" )");
-            r.run_lazy([&h_cells,&v](auto &s) {
+            r.run_span([&h_cells, &v](auto &s) {
                            std::string value;
                            s.read_value(value);
                            v.push_back(value);
                            ++h_cells;
-                       }
-                       , [&v_cells,&v2](auto &s) {
+                       }, [&v_cells, &v2](auto &s) {
                            std::string value;
                            s.read_value(value);
                            v2.push_back(value);
                            ++v_cells;
-                       }
-                       , [&rows] {
+                       }, [&rows] {
                            ++rows;
                        }
             );

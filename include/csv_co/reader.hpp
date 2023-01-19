@@ -307,8 +307,8 @@ namespace csv_co {
             inline void clear () {b = nullptr;}
 
             friend auto reader::parse_cell_span() const noexcept -> FSM_cell_span;
-            friend void reader::run_lazy(value_field_span_cb_t, new_row_cb_t) const;
-            friend void reader::run_lazy(header_field_span_cb_t, value_field_span_cb_t, new_row_cb_t) const;
+            friend void reader::run_span(value_field_span_cb_t, new_row_cb_t) const;
+            friend void reader::run_span(header_field_span_cb_t, value_field_span_cb_t, new_row_cb_t) const;
             template<typename T, typename U>
             friend struct async_generator;
         public:
@@ -606,7 +606,7 @@ namespace csv_co {
             }, src);
         }
 
-        void run_lazy(value_field_span_cb_t fcb, new_row_cb_t nrc=[]{}) const {
+        void run_span(value_field_span_cb_t fcb, new_row_cb_t nrc= [] {}) const {
             vfcs_cb = std::move(fcb);
             new_row_cb = std::move(nrc);
             std::visit([this](auto&& arg) noexcept {
@@ -675,7 +675,7 @@ namespace csv_co {
             }, src);
         }
 
-        void run_lazy(header_field_span_cb_t hfcb, value_field_span_cb_t fcb, new_row_cb_t nrc=[]{}) const {
+        void run_span(header_field_span_cb_t hfcb, value_field_span_cb_t fcb, new_row_cb_t nrc= [] {}) const {
             hfcs_cb = std::move(hfcb);
             vfcs_cb = std::move(fcb);
             new_row_cb = std::move(nrc);

@@ -15,9 +15,9 @@
 *    [Build All](#build-all)
 
 ### About
-CSV_co is a C++20 coroutine-driven, callback-providing and stable CSV data reader, or parser.
-Hope, it is in line with standard RFC 4180 because was conceived to handle with field selection
-carefully. The following requirements tend to be satisfied:
+CSV_co is a C++20 coroutine-driven, callback-providing and stable CSV data reader, or parser. Hope,
+it is in line with standard RFC 4180 because was conceived to handle with field selection carefully.
+The following requirements tend to be satisfied:
 
 - Windows and Unix style line endings.
 - Optional header line.
@@ -35,11 +35,11 @@ Because I am very unsure about some authors' workings on complicated CSV fields.
 
 > Why are you unquoting quoted fields?
 
-Because quotes are for *preprocessing*, not the end-users.
+Because quotes are for *preprocessing*, not for end users.
 
 > How fast is it?
 
-Well, it is far from being the fastest. But look at [Benchmarks](#benchmarks).
+Well, it is far from being "the fastest". But look at [Benchmarks](#benchmarks).
 
 ### Features
 - Memory-mapping CSV files.
@@ -49,15 +49,15 @@ Well, it is far from being the fastest. But look at [Benchmarks](#benchmarks).
 - Callbacks for new rows.
 - String data type only, apply type casts on your own.
 - Strong typed (concept-based) reader template parameters.
-- Tested
+- Tested.
 
 ### Minimum Supported Compilers
 - Linux
   - GNU GCC 10.2 C++ compiler
-  - LLVM Clang 12.0 C++ compiler 
+  - LLVM Clang 12.0 C++ compiler
 - Windows
   - Cygwin with GCC 10.2 C++ compiler
-  - Microsoft Visual Studio 2019 Update 9 (16.9.4) + 
+  - Microsoft Visual Studio 2019 Update 9 (16.9.4) +
   - MinGW with GCC 10.2 C++ compiler
 
 ### Acknowledgments
@@ -77,7 +77,7 @@ r.run([](auto s) {
 });
 ```
 
-"Energetic" mode, save all fields to a container and view a data:
+Ready value iteration mode, save all fields to a container and view a data:
 ```cpp
 try {
     reader_type r(std::filesystem::path("smallpop.csv"));
@@ -99,7 +99,7 @@ try {
 }
 ```
 
-"Energetic" mode, use `new row` callback to facilitate filling a matrix:
+Ready value iteration mode, use `new row` callback to facilitate filling a matrix:
 ```cpp
 try {
     reader<trim_policy::alltrim> r (std::filesystem::path("smallpop.csv"));
@@ -136,11 +136,11 @@ the parser is keeping the memory span corresponding to the current field and giv
 opportunity to get the value of this field in the container you provide. So, preferable way
 of doing things is right underneath.
 
-"Lazy" mode, get necessary fields:
+Span iteration mode, get necessary fields:
 ```cpp
 // ignore header fields, obtain value fields, trace rows:
 reader<...> r (...);
-r.valid().run_lazy(
+r.valid().run_span(
      [](auto) {}
     ,[&](auto & s) { if (some col or row) { cell_string value; s.read_value(value); }}
     ,[&]{ row++; col = 0; });
@@ -173,17 +173,17 @@ public:
 
     // Validation
     [[nodiscard]] reader& valid();
-        
+
     // Parsing
     void run(value_field_cb_t, new_row_cb_t nrc=[]{}) const;
     void run(header_field_cb_t, value_field_cb_t, new_row_cb_t nrc=[]{}) const;
-    void run_lazy(value_field_span_cb_t, new_row_cb_t nrc=[]{}) const;
-    void run_lazy(header_field_span_cb_t, value_field_span_cb_t, new_row_cb_t nrc=[]{}) const;
-        
-    // Reading fields' values within run_lazy's() callbacks
+    void run_span(value_field_span_cb_t, new_row_cb_t nrc=[]{}) const;
+    void run_span(header_field_span_cb_t, value_field_span_cb_t, new_row_cb_t nrc=[]{}) const;
+
+    // Reading fields' values within run_span's() callbacks
     class cell_span {
     public:
-        void read_value(auto & any_container_supporting_construction_from_substring) const;
+        void read_value(auto & any_container_supporting_assignment_from_substring) const;
     };
 
     // Callback types
@@ -203,12 +203,12 @@ may be easily implemented sometime.
 
 ### Benchmarks
 
-Benchmarking source code is in `benchmark` folder. It measures, in lazy iteration mode, the
+Benchmarking source code is in `benchmark` folder. It measures, in span iteration mode, the
 average execution time (after a warmup run) for `CSV_co` to memory-map the input CSV
 file and iterate over every field in it.
 ```bash
 cd benchmark
-clang++ -I../include -O3 -std=c++20 -stdlib=libc++ ./lazybench.cpp
+clang++ -I../include -O3 -march=native -std=c++20 -stdlib=libc++ ./spanbench.cpp
 cd ..
 ```
 #### System Details

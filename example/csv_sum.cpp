@@ -14,10 +14,9 @@ int main() {
         constexpr unsigned population_col = 3;
         auto sum = 0u;
 
-        r.valid().run_lazy(
-                [](auto) {}
-                , [&sum](auto & s) {
-                    static auto col {0u};
+        r.valid().run_span(
+                [](auto) {}, [&sum](auto &s) {
+                    static auto col{0u};
                     if (col++ == population_col) {
                         col = 0;
                         cell_string value;
