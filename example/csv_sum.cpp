@@ -9,7 +9,7 @@ int main() {
     using namespace csv_co;
 
     try {
-       reader r(std::filesystem::path("smallpop.csv"));
+        reader r(std::filesystem::path("smallpop.csv"));
 
         constexpr unsigned population_col = 3;
         auto sum = 0u;

@@ -15,7 +15,7 @@
 *    [Build All](#build-all)
 
 ### About
-CSV_co is a C++20 coroutine-driven, callback-providing and stable CSV data reader, or parser. Hope,
+CSV_co is a C++20 coroutine-driven, callback-providing and sane CSV data reader, or parser. Hope,
 it is in line with standard RFC 4180 because was conceived to handle with field selection carefully.
 The following requirements tend to be satisfied:
 
@@ -197,9 +197,10 @@ public:
 
 ### Problems
 
-Frequent coroutine switching due to current byte-parsing protocol which lead to time-consuming
+1. Frequent coroutine switching due to current byte-parsing protocol which lead to time-consuming
 overheads. Well, another approach would bring parsing clarity at the expense of speed. That
-may be easily implemented sometime.
+may be easily implemented sometime. Patches are welcome!
+2.  
 
 ### Benchmarks
 

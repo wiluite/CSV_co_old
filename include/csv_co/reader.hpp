@@ -233,7 +233,7 @@ namespace csv_co {
                         std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<std::size_t>> ||
                         std::is_same_v<decltype(mCoroHdl.promise().mValue), std::optional<bool>> )
                     mCoroHdl.promise().mValue = std::nullopt;
-                else
+                else // Single pointer assignment economy :
                     mCoroHdl.promise().mValue.clear();
                 return tmp;
             }
@@ -298,6 +298,7 @@ namespace csv_co {
         using value_field_span_cb_t = std::function <void (cell_span const & span)>;
         using new_row_cb_t = std::function <void ()>;
 
+        // Field value getter in run_span()
         class cell_span {
         private:
             typename cell_string::const_pointer b = nullptr;
@@ -307,8 +308,9 @@ namespace csv_co {
             inline void clear () {b = nullptr;}
 
             friend auto reader::parse_cell_span() const noexcept -> FSM_cell_span;
-            friend void reader::run_span(value_field_span_cb_t, new_row_cb_t) const;
-            friend void reader::run_span(header_field_span_cb_t, value_field_span_cb_t, new_row_cb_t) const;
+            friend auto reader::run_span(value_field_span_cb_t, new_row_cb_t) const -> void;
+            friend auto reader::run_span(header_field_span_cb_t, value_field_span_cb_t, new_row_cb_t) const -> void;
+            friend auto reader::last_LF(const auto &arg, FSM_cell_span &p) const -> void;
             template<typename T, typename U>
             friend struct async_generator;
         public:
@@ -331,6 +333,7 @@ namespace csv_co {
             return Delimiter::value == b || LF == b;
         }
 
+        // Coroutine that parses CSV-stream for Ready-value mode
         #define finalize_field(f) TrimPolicy::trim(f); \
                                   field.push_back(b);  \
                                   co_yield field;      \
@@ -370,6 +373,7 @@ namespace csv_co {
             }
         }
 
+        // Coroutine that parses CSV-stream for spanning mode
         auto parse_cell_span() const noexcept -> FSM_cell_span {
             cell_span noopt_span;
 
@@ -383,8 +387,7 @@ namespace csv_co {
                 if (limiter(b)) {
                     co_yield noopt_span;
                     noopt_span.b = noopt_span.e;
-                    continue;
-                }
+                } else
                 if (Quote::value == b) {
                     unsigned quote_counter {1};
                     for(;;) {
@@ -401,6 +404,7 @@ namespace csv_co {
             }
         }
 
+        // Coroutine that parses CSV-stream for columns counting
         auto parse_cols() const noexcept -> FSM_cols {
             std::optional<std::size_t> cols = 0;
             for(;;) {
@@ -411,8 +415,7 @@ namespace csv_co {
                         co_yield cols;
                         cols = 0;
                     }
-                    continue;
-                }
+                } else
                 if (Quote::value == b) {
                     unsigned quote_counter = 1;
                     for(;;) {
@@ -431,6 +434,7 @@ namespace csv_co {
             }
         }
 
+        // Coroutine that parses CSV-stream for rows counting
         auto parse_rows() const noexcept -> FSM_rows {
             std::optional<bool> line_end;
             for (;;) {
@@ -440,8 +444,7 @@ namespace csv_co {
                         line_end = true;
                         co_yield line_end;
                     }
-                    continue;
-                }
+                } else
                 if (Quote::value == b) {
                     unsigned quote_counter = 1;
                     for (;;) {
@@ -461,6 +464,7 @@ namespace csv_co {
 
         using coroutine_stream_type = mio::ro_mmap::value_type;
 
+        // Returns sending coroutine for Ready-value mode
         template <typename Range>
         auto sender(Range const & r) const -> generator<coroutine_stream_type> {
             for (auto e : r) {
@@ -478,17 +482,34 @@ namespace csv_co {
                 }
         }
 
+        // Returns sending coroutine for spanning mode
         template <typename Range>
-        auto sender_span(Range const & r) const -> generator<coroutine_stream_type> {
+        auto span_sender(Range const & r) const -> generator<coroutine_stream_type> {
             for (auto e : r) {
                 co_yield e;
             }
         }
+
+        // Returns coroutine sending the last LF
         template <typename Range>
-        auto sender_span_LF(Range const &) const -> generator<coroutine_stream_type> {
+        auto span_LF_sender(Range const &) const -> generator<coroutine_stream_type> {
             co_yield '\n';
         }
 
+        // Function sending the last LF
+        void last_LF(const auto &arg, FSM_cell_span &p) const {
+            if (arg.back() != LF) {
+                p.send(*(span_LF_sender(arg).begin()));
+                if (const auto &r = p(); r()) {
+                    auto res = r;
+                    res.e--;
+                    vfcs_cb(res);
+                    new_row_cb(); // Unconditionally
+                }
+            }
+        }
+
+        // Multi-source CVS
         std::variant<mio::ro_mmap, cell_string> src;
 
         // nullptr by default, or user-defined by run(). UB if nullptr
@@ -498,7 +519,9 @@ namespace csv_co {
         // defaulted or user-defined by run(), or UB if user-defined nullptr
         mutable new_row_cb_t new_row_cb;
 
+        // nullptr by default, or user-defined by run_span(). UB if nullptr
         mutable header_field_span_cb_t hfcs_cb;
+        // always user-defined: by run_span() or UB if user-defined nullptr
         mutable value_field_span_cb_t  vfcs_cb;
 
     public:
@@ -525,12 +548,14 @@ namespace csv_co {
         // let us express C-style string parameter constructor via usual string parameter constructor
         explicit reader (const char * csv_src) : reader(cell_string(csv_src)) {}
 
+        // Move operations work by default - see tests
         reader (reader && other) noexcept = default;
         auto operator=(reader && other) noexcept -> reader & = default;
 
+        // Columns getter
         [[nodiscard]] auto cols() const noexcept -> std::size_t {
             auto result {0};
-            std::visit([&](auto&& arg) {
+            std::visit([this, &result](auto&& arg) noexcept {
                 auto source = sender(arg);
                 auto p = parse_cols();
                 for(const auto& b : source) {
@@ -544,13 +569,12 @@ namespace csv_co {
             return result;
         }
 
+        // Rows getter
         [[nodiscard]] auto rows() const noexcept -> std::size_t {
             auto rows {0};
-
-            std::visit([&](auto&& arg) {
+            std::visit([&](auto&& arg) noexcept {
                 auto source = sender(arg);
                 auto p = parse_rows();
-
                 for(const auto& b : source) {
                     p.send(b);
                     if (const auto& res = p(); res.has_value()) {
@@ -561,6 +585,7 @@ namespace csv_co {
             return rows;
         }
 
+        // CSV-stream validator
         [[nodiscard]] auto valid() -> reader& {
             std::visit([&](auto&& arg) {
                 auto result {false};
@@ -574,7 +599,7 @@ namespace csv_co {
                             curr_cols = res.value();
                             result = true; // if no more lines but this - stay valid!
                         } else {
-                            if (!(result = (curr_cols.value() == res.value()))) {
+                            if (!(result = (curr_cols.value() == res.value()))) { //TODO: One of Clion static analyzers
                                 throw exception ("Incorrect CSV source format");
                             }
                         }
@@ -588,6 +613,7 @@ namespace csv_co {
             return *this;
         }
 
+        // Executes Ready-value mode
         void run(value_field_cb_t fcb, new_row_cb_t nrc=[]{}) const {
             vf_cb = std::move(fcb);
             new_row_cb = std::move(nrc);
@@ -606,12 +632,13 @@ namespace csv_co {
             }, src);
         }
 
+        // Executes Spanning mode
         void run_span(value_field_span_cb_t fcb, new_row_cb_t nrc= [] {}) const {
             vfcs_cb = std::move(fcb);
             new_row_cb = std::move(nrc);
             std::visit([this](auto&& arg) noexcept {
                 auto const range_end = std::addressof(arg[arg.size()]);
-                auto source = sender_span(arg);
+                auto source = span_sender(arg);
                 auto p = parse_cell_span();
                 for (auto const & b: source) {
                     p.send(b);
@@ -630,19 +657,11 @@ namespace csv_co {
                 // So we have to go for the trick. Otherwise, we would have to double-check for
                 // every one field in the cycle above. (See revision history)
 
-                if (arg.back() != LF) {
-                    auto src_ = sender_span_LF(arg);
-                    p.send(*(src_.begin()));
-                    if (const auto &r = p(); r()) {
-                        auto res = r;
-                        res.e--;
-                        vfcs_cb(res);
-                        new_row_cb(); // Unconditionally
-                    }
-                }
+                last_LF(arg, p);
             }, src);
         }
 
+        // Executes Ready-value mode (overload)
         void run(header_field_cb_t hfcb, value_field_cb_t fcb, new_row_cb_t nrc=[]{}) const {
             hf_cb = std::move(hfcb);
             vf_cb = std::move(fcb);
@@ -651,22 +670,13 @@ namespace csv_co {
                 auto columns = cols();
                 auto source = sender(arg);
                 auto p = parse();
-                auto b = source.begin();
-                while(columns) {
-                    p.send(*b);
-                    ++b;
-                    if (const auto &res = p(); !res.empty()) {
-                        hf_cb(std::string_view{res.begin(),res.end()-1});
-                        columns--;
-                    }
-                }
-                new_row_cb();
 
-                while (b != source.end()) {
-                    p.send(*b);
-                    ++b;
+                for (auto const & b: source) {
+                    p.send(b);
                     if (const auto &res = p(); !res.empty()) {
-                        vf_cb(std::string_view{res.begin(),res.end()-1});
+                        !columns ? vf_cb(std::string_view{res.begin(),res.end()-1}) :
+                        hf_cb(std::string_view{res.begin(),res.end()-1});
+                        columns = columns ? columns-1 : 0;
                         if (LF == res.back()) {
                             new_row_cb();
                         }
@@ -675,33 +685,25 @@ namespace csv_co {
             }, src);
         }
 
+        // Executes Spanning mode (overload)
         void run_span(header_field_span_cb_t hfcb, value_field_span_cb_t fcb, new_row_cb_t nrc= [] {}) const {
             hfcs_cb = std::move(hfcb);
             vfcs_cb = std::move(fcb);
             new_row_cb = std::move(nrc);
-            std::visit([&](auto&& arg) {
+
+            std::visit([this](auto&& arg) noexcept {
                 auto columns = cols();
-                auto source = sender_span(arg);
+                auto source = span_sender(arg);
                 auto p = parse_cell_span();
-                auto b = source.begin();
-                while(columns) {
-                    p.send(*b);
-                    ++b;
-                    if (auto res = p(); res()) {
-                        res.e--;
-                        hfcs_cb(res);
-                        columns--;
-                    }
-                }
-                new_row_cb();
-                while (b != source.end()) {
-                    p.send(*b);
-                    ++b;
-                    if (const auto &r = p(); r()) {
+
+                for (auto const & b: source) {
+                    p.send(b);
+                    if (const auto & r = p(); r()) {
                         auto res = r;
                         res.e--;
-                        vfcs_cb(res);
-                        if(*(res.e) == LF) {
+                        !columns ? vfcs_cb(res) : hfcs_cb(res);
+                        columns = columns ? columns-1 : 0;
+                        if (*res.e == LF) {
                             new_row_cb();
                         }
                     }
@@ -712,17 +714,8 @@ namespace csv_co {
                 // So we have to go for the trick. Otherwise, we would have to double-check for
                 // every one field in the cycle above. (See revision history)
 
-                if (arg.back() != LF) {
-                    auto src_ = sender_span_LF(arg);
-                    p.send(*src_.begin());
-                    if (const auto &r = p(); r()) {
-                        auto res = r;
-                        res.e--;
-                        vfcs_cb(res);
-                        new_row_cb(); // Unconditionally
-                    }
-                }
-            },src);
+                last_LF(arg, p);
+            }, src);
         }
 
         struct exception : public std::runtime_error {
