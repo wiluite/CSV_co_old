@@ -15,9 +15,9 @@
 *    [Build All](#build-all)
 
 ### About
-CSV_co is a C++20 coroutine-driven, callback-providing and sane CSV data reader, or parser. Hope,
-it is in line with standard RFC 4180 because was conceived to handle with field selection carefully.
-The following requirements tend to be satisfied:
+CSV_co is a C++20 coroutine-driven, callback-providing and sane CSV data reader, or parser. Hope, it
+is in line with standard RFC 4180. This is because it was conceived to handle with field selection
+carefully. The following requirements tend to be satisfied:
 
 - Windows and Unix style line endings.
 - Optional header line.
@@ -39,7 +39,7 @@ Because quotes are for *preprocessing*, not for end users.
 
 > How fast is it?
 
-Well, it is far from being "the fastest". But look at [Benchmarks](#benchmarks).
+Well, it seems far from being "the fastest". But look at [Benchmarks](#benchmarks).
 
 ### Features
 - Memory-mapping CSV files.
@@ -129,12 +129,11 @@ reader (R"("William said: ""I am going home, but someone always bothers me""","M
     });
 ```
 
-In above examples parser works hard to select, prepare and provide every field. This is
-somewhat more time-consuming, especially if you are interested in specific fields and in
-common would prefer to move forward faster. There is an option for lazier field iteration:
-the parser is keeping the memory span corresponding to the current field and gives you the
-opportunity to get the value of this field in the container you provide. So, preferable way
-of doing things is right underneath.
+In above examples parser works hard to select, prepare and provide every field. This is somewhat
+more time-consuming, especially if you are interested in specific fields and in common would prefer
+to move forward faster. There is an option for lazier field iteration: the parser is keeping the
+memory span corresponding to the current field and gives you the opportunity to get the value of
+this field in the container you provide. So, preferable way of doing things is right underneath.
 
 Span iteration mode, get necessary fields:
 ```cpp
@@ -192,15 +191,22 @@ public:
     using header_field_span_cb_t = std::function <void (cell_span const & )>;
     using value_field_span_cb_t = std::function <void (cell_span const & )>;
     using new_row_cb_t = std::function <void ()>;
+
+    // Exception type
+    struct exception : public std::runtime_error {
+        // Constructor
+        template <typename ... Types>
+        explicit constexpr exception(Types ... args);
+    }
 };
 ```
 
 ### Problems
 
 1. Frequent coroutine switching due to current byte-parsing protocol which lead to time-consuming
-overheads. Well, another approach would bring parsing clarity at the expense of speed. That
-may be easily implemented sometime. Patches are welcome!
-2.  
+overhead. Well, another approach would bring parsing clarity at the expense of speed. Probably,
+that is to implement sometime. Pull requests are welcome.
+2. run() and run_span() dealing with header fields have 3-4% performance cost. Patch is welcome.
 
 ### Benchmarks
 
@@ -221,7 +227,6 @@ cd ..
 | HDD/SSD       | USB hard drive                                  |
 | OS            | Linux slax 5.10.92 (Debian Linux 11 (bullseye)) |
 | C++ Compiler  | Clang 15.0.6                                    |
-
 
 #### Results
 

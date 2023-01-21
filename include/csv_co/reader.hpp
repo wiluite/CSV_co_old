@@ -301,11 +301,11 @@ namespace csv_co {
         // Field value getter in run_span()
         class cell_span {
         private:
-            typename cell_string::const_pointer b = nullptr;
+            typename cell_string::const_pointer mutable b = nullptr;
             typename cell_string::const_pointer e = nullptr;
 
-            inline auto operator()() const noexcept -> bool { return (b != nullptr); }
-            inline void clear () {b = nullptr;}
+            auto operator()() const noexcept -> bool { return b != nullptr; }
+            void clear () const noexcept {b = nullptr;}
 
             friend auto reader::parse_cell_span() const noexcept -> FSM_cell_span;
             friend auto reader::run_span(value_field_span_cb_t, new_row_cb_t) const -> void;
